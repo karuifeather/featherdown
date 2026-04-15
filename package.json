@@ -1,7 +1,7 @@
 {
   "name": "blog-pipeline",
   "version": "0.0.0",
-  "description": "A TypeScript library for turning Markdown into publishable HTML (under active development).",
+  "description": "TypeScript library for Markdown-to-HTML publishing workflows.",
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -29,7 +29,7 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=18"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

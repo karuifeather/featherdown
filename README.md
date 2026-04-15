@@ -447,14 +447,21 @@ const html = await renderMarkdownToHtmlWithMermaid(
 );
 ````
 
-Use this entry in Node publishing environments where Playwright + Chromium dependencies are acceptable.
+Use this entry in Node publishing/build environments where Playwright + Chromium dependencies are acceptable.
+
+Behavior contract for Mermaid blocks in this entry:
+
+- valid Mermaid fences render to inline sanitized SVG
+- invalid Mermaid fences fall back to a normal rendered code block
+- one Mermaid failure does not stop the rest of the document from rendering
 
 The Mermaid subpath is npm-focused and is **not** part of the JSR export surface.
 
 ## Runtime boundaries
 
 - `featherdown` default entry is browser-safe and Mermaid-free.
-- `featherdown/node` is Node-focused and includes Mermaid rendering dependencies.
+- `featherdown/node` is Node-only and includes Mermaid rendering dependencies.
+- `featherdown/node` requires Playwright Chromium setup in the runtime environment.
 - JSR export surface is default-entry focused; Mermaid entry is npm subpath only.
 
 ## CSS / Asset Expectations
@@ -468,7 +475,8 @@ The Mermaid subpath is npm-focused and is **not** part of the JSR export surface
 - Input is sanitized with `rehype-sanitize`.
 - Script tags are stripped.
 - The default entry is designed to be browser-safe.
-- The Mermaid entry is better suited to trusted Node publishing workflows than arbitrary user-generated content.
+- The Mermaid entry is Node-only and is better suited to trusted or controlled publishing inputs than arbitrary user-generated content.
+- For general-purpose rendering of untrusted content, prefer the default `featherdown` entry.
 - Always review your final HTML integration, especially if you add custom plugins around the built-in pipeline.
 
 ## Why not just wire unified yourself?

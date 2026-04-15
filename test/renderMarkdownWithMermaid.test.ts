@@ -77,6 +77,30 @@ describe('renderMarkdownToHtmlWithMermaid', () => {
     expect(html).not.toContain('<script>');
   });
 
+  it('falls back to a normal code block when a mermaid fence is invalid and keeps rendering the rest of the document', async () => {
+    const md = [
+      '# Intro',
+      '',
+      '```mermaid',
+      'graph TD; A-->',
+      '```',
+      '',
+      'After diagram.',
+      '',
+      '```ts',
+      'const x = 1;',
+      '```',
+      '',
+    ].join('\n');
+    const html = await renderMarkdownToHtmlWithMermaid(md);
+    expect(html).toContain('<h1 id="user-content-intro"><a href="#intro">Intro</a></h1>');
+    expect(html).toContain('<pre><code class="language-mermaid">graph TD; A-->\n</code></pre>');
+    expect(html).toContain('<p>After diagram.</p>');
+    expect(html).toContain('<pre><code class="language-ts">');
+    expect(html).toContain('<span class="hljs-keyword">const</span> x = <span class="hljs-number">1</span>;');
+    expect(html).not.toContain('<svg');
+  });
+
   it('does not change default browser-safe behavior', async () => {
     const md = ['```mermaid', 'graph TD; A-->B;', '```', ''].join('\n');
     const html = await renderMarkdownToHtml(md);

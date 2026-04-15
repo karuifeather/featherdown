@@ -8,7 +8,7 @@ import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeSlug from 'rehype-slug';
 import rehypeStringify from 'rehype-stringify';
-import type { Root as HastRoot } from 'hast';
+import type { Element, Root as HastRoot } from 'hast';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
@@ -42,6 +42,8 @@ function rehypeStripHeadingCustomIdMarker() {
 export function createMarkdownProcessorWithMermaidInternal(
   options?: RenderMarkdownOptions,
 ) {
+  const fallbackToOriginalCodeBlock = (element: Element): Element => element;
+
   return unified()
     .use(remarkParse)
     .use(remarkGfm)
@@ -56,7 +58,10 @@ export function createMarkdownProcessorWithMermaidInternal(
     .use(rehypeCodeBlockTitles)
     .use(rehypeKatex, { output: 'html' })
     .use(rehypeHighlight)
-    .use(rehypeMermaid, { strategy: 'inline-svg' })
+    .use(rehypeMermaid, {
+      strategy: 'inline-svg',
+      errorFallback: fallbackToOriginalCodeBlock,
+    })
     .use(rehypeSanitize, schemaWithSvg)
     .use(rehypeCodeLineHighlights)
     .use(rehypeStripHeadingCustomIdMarker)

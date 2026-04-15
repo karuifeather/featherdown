@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
 const root = await import('../dist/index.js');
 const nodeOnly = await import('../dist/node.js');
@@ -11,6 +12,20 @@ assert.equal(typeof root.rehypeCdnImages, 'function');
 assert.equal(typeof root.parseMarkdownFile, 'function');
 
 assert.equal(typeof nodeOnly.renderMarkdownToHtmlWithMermaid, 'function');
+
+const rootCode = await readFile(new URL('../dist/index.js', import.meta.url), 'utf8');
+const nodeCode = await readFile(new URL('../dist/node.js', import.meta.url), 'utf8');
+
+assert.equal(
+  rootCode.includes('rehype-mermaidjs') || rootCode.includes('playwright'),
+  false,
+  'Default entry must stay free of Mermaid/Playwright paths.',
+);
+assert.equal(
+  nodeCode.includes('rehype-mermaidjs'),
+  true,
+  'Node-only entry should include Mermaid integration.',
+);
 
 assert.equal(
   root.libraryId(),

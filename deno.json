@@ -2,6 +2,10 @@
   "name": "@karuifeather/featherdown",
   "version": "0.1.1",
   "unstable": ["sloppy-imports"],
+  "imports": {
+    "hast": "npm:@types/hast@^3.0.4",
+    "mdast": "npm:@types/mdast@^4.0.4"
+  },
   "exports": {
     ".": "./src/index.ts",
     "./parseMarkdownFile": "./src/parseMarkdownFile.ts",

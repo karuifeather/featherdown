@@ -27,6 +27,7 @@ export function remarkHeadingIds(): (tree: Root) => undefined {
       };
       data.id = id;
       data.hProperties.id = id;
+      data.hProperties.dataHeadingCustomId = 'true';
 
       last.value = last.value.slice(0, match.index).replace(/\s+$/, '');
     });

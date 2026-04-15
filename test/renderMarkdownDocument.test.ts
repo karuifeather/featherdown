@@ -18,6 +18,10 @@ describe('renderMarkdownDocument', () => {
       { depth: 1, text: 'Title', id: 'title' },
       { depth: 2, text: 'Details', id: 'details' },
     ]);
+    expect(result.headings).toEqual([
+      { index: 0, depth: 1, text: 'Title', id: 'title', hasCustomId: false },
+      { index: 1, depth: 2, text: 'Details', id: 'details', hasCustomId: false },
+    ]);
     expect(result.excerpt).toBe('First paragraph for excerpt text.');
     expect(result.wordCount).toBeGreaterThan(0);
     expect(result.estimatedReadingMinutes).toBe(1);
@@ -35,6 +39,10 @@ describe('renderMarkdownDocument', () => {
       { depth: 2, text: 'Hello', id: 'hello' },
       { depth: 2, text: 'Hello', id: 'hello-1' },
     ]);
+    expect(result.headings).toEqual([
+      { index: 0, depth: 2, text: 'Hello', id: 'hello', hasCustomId: false },
+      { index: 1, depth: 2, text: 'Hello', id: 'hello-1', hasCustomId: false },
+    ]);
     expect(result.html).toContain('<h2 id="hello"><a href="#hello">Hello</a></h2>');
     expect(result.html).toContain('<h2 id="hello-1"><a href="#hello-1">Hello</a></h2>');
   });
@@ -43,6 +51,41 @@ describe('renderMarkdownDocument', () => {
     const result = await renderMarkdownDocument('## My Title {#custom-slug}\n');
     expect(result.toc).toEqual([
       { depth: 2, text: 'My Title', id: 'user-content-custom-slug' },
+    ]);
+    expect(result.headings).toEqual([
+      {
+        index: 0,
+        depth: 2,
+        text: 'My Title',
+        id: 'user-content-custom-slug',
+        hasCustomId: true,
+      },
+    ]);
+    expect(result.html).not.toContain('data-heading-custom-id');
+  });
+
+  it('marks slug-generated heading ids with hasCustomId false', async () => {
+    const result = await renderMarkdownDocument('## Section One\n');
+    expect(result.headings).toEqual([
+      { index: 0, depth: 2, text: 'Section One', id: 'section-one', hasCustomId: false },
+    ]);
+  });
+
+  it('keeps toc output unchanged while returning richer headings metadata', async () => {
+    const result = await renderMarkdownDocument(['# One', '', '## Two {#two-id}', ''].join('\n'));
+    expect(result.toc).toEqual([
+      { depth: 1, text: 'One', id: 'one' },
+      { depth: 2, text: 'Two', id: 'user-content-two-id' },
+    ]);
+    expect(result.headings).toEqual([
+      { index: 0, depth: 1, text: 'One', id: 'one', hasCustomId: false },
+      {
+        index: 1,
+        depth: 2,
+        text: 'Two',
+        id: 'user-content-two-id',
+        hasCustomId: true,
+      },
     ]);
   });
 
@@ -62,6 +105,106 @@ describe('renderMarkdownDocument', () => {
     const markdown = ['# Heading Only', '', '```chart-line', '{"labels":["a"],"datasets":[]}', '```', ''].join('\n');
     const result = await renderMarkdownDocument(markdown);
     expect(result.excerpt).toBeNull();
+  });
+
+  it('keeps document metadata behavior when titled code blocks are present', async () => {
+    const markdown = [
+      '# Title',
+      '',
+      'Intro paragraph.',
+      '',
+      '```ts title="example.ts"',
+      'const value = 1;',
+      '```',
+      '',
+      '## Section',
+      'More text.',
+      '',
+    ].join('\n');
+    const result = await renderMarkdownDocument(markdown);
+    expect(result.html).toContain('<div class="code-block"><div class="code-block-title">example.ts</div>');
+    expect(result.toc).toEqual([
+      { depth: 1, text: 'Title', id: 'title' },
+      { depth: 2, text: 'Section', id: 'section' },
+    ]);
+    expect(result.excerpt).toBe('Intro paragraph.');
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('keeps document metadata behavior when code line highlights are present', async () => {
+    const markdown = [
+      '# Title',
+      '',
+      'Intro paragraph.',
+      '',
+      '```ts {2}',
+      'const a = 1;',
+      'const b = 2;',
+      '```',
+      '',
+      '## Section',
+      'More text.',
+      '',
+    ].join('\n');
+    const result = await renderMarkdownDocument(markdown);
+    expect(result.html).toContain('<span class="code-line code-line-highlighted"><span class="hljs-keyword">const</span> b = <span class="hljs-number">2</span>;</span>');
+    expect(result.toc).toEqual([
+      { depth: 1, text: 'Title', id: 'title' },
+      { depth: 2, text: 'Section', id: 'section' },
+    ]);
+    expect(result.excerpt).toBe('Intro paragraph.');
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('keeps document metadata behavior when numbered code blocks are present', async () => {
+    const markdown = [
+      '# Title',
+      '',
+      'Intro paragraph.',
+      '',
+      '```ts showLineNumbers',
+      'const a = 1;',
+      'const b = 2;',
+      '```',
+      '',
+      '## Section',
+      'More text.',
+      '',
+    ].join('\n');
+    const result = await renderMarkdownDocument(markdown);
+    expect(result.html).toContain('<code class="hljs language-ts code-line-numbered">');
+    expect(result.html).toContain('<span class="code-line-number">1</span>');
+    expect(result.toc).toEqual([
+      { depth: 1, text: 'Title', id: 'title' },
+      { depth: 2, text: 'Section', id: 'section' },
+    ]);
+    expect(result.excerpt).toBe('Intro paragraph.');
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('keeps document metadata behavior when copyable code blocks are present', async () => {
+    const markdown = [
+      '# Title',
+      '',
+      'Intro paragraph.',
+      '',
+      '```ts showCopyButton',
+      'const a = 1;',
+      '```',
+      '',
+      '## Section',
+      'More text.',
+      '',
+    ].join('\n');
+    const result = await renderMarkdownDocument(markdown);
+    expect(result.html).toContain('<div class="code-block code-block-copyable">');
+    expect(result.html).toContain('<button type="button" class="code-block-copy-button" data-code-copy=""');
+    expect(result.toc).toEqual([
+      { depth: 1, text: 'Title', id: 'title' },
+      { depth: 2, text: 'Section', id: 'section' },
+    ]);
+    expect(result.excerpt).toBe('Intro paragraph.');
+    expect(result.diagnostics).toEqual([]);
   });
 
   it('returns deterministic word count and reading minutes', async () => {

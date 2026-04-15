@@ -73,6 +73,32 @@ export type TocItem = {
 };
 
 /**
+ * Rich heading metadata extracted from final rendered document structure.
+ */
+export type HeadingMetadata = {
+  /**
+   * Zero-based heading index in document order among included headings.
+   */
+  index: number;
+  /**
+   * Final heading level from 1 to 6.
+   */
+  depth: number;
+  /**
+   * Final heading text content.
+   */
+  text: string;
+  /**
+   * Final heading id used in rendered HTML.
+   */
+  id: string;
+  /**
+   * Whether the heading id comes from explicit `{#custom-id}` syntax.
+   */
+  hasCustomId: boolean;
+};
+
+/**
  * Full render output for publishing workflows.
  */
 export type RenderMarkdownDocumentResult = {
@@ -89,6 +115,11 @@ export type RenderMarkdownDocumentResult = {
    * Entries are included only when a final heading id exists.
    */
   toc: TocItem[];
+  /**
+   * Rich heading metadata in document order.
+   * Entries are included only when a final heading id exists.
+   */
+  headings: HeadingMetadata[];
   /**
    * First meaningful plain-text excerpt from rendered `p`, `blockquote`,
    * or `li` content, in document order. Returns `null` when no such content

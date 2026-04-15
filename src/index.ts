@@ -21,6 +21,7 @@ export { renderMarkdownDocument } from './renderMarkdownDocument.js';
 export { renderMarkdownToHtml } from './renderMarkdownToHtml.js';
 /** Shared public rendering option and diagnostic types. */
 export type {
+  HeadingMetadata,
   RenderDiagnostic,
   RenderMarkdownDocumentResult,
   RenderMarkdownOptions,

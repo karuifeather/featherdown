@@ -2,7 +2,12 @@ import { toText } from 'hast-util-to-text';
 import { EXIT, visit } from 'unist-util-visit';
 import { createMarkdownProcessorInternal } from './createMarkdownProcessorInternal.js';
 import { createDiagnosticCollector } from './diagnostics.js';
-import type { RenderMarkdownDocumentResult, RenderMarkdownOptions, TocItem } from '../types.js';
+import type {
+  HeadingMetadata,
+  RenderMarkdownDocumentResult,
+  RenderMarkdownOptions,
+  TocItem,
+} from '../types.js';
 import type { Element, Root as HastRoot } from 'hast';
 
 const WORDS_PER_MINUTE = 200;
@@ -27,8 +32,12 @@ function isParagraphLikeTagName(tagName: string): tagName is ParagraphLikeTagNam
   return excerptTagNames.has(tagName as ParagraphLikeTagName);
 }
 
-function extractToc(root: HastRoot): TocItem[] {
-  const toc: TocItem[] = [];
+function isCustomHeadingId(value: unknown): boolean {
+  return value === true || value === 'true' || value === '';
+}
+
+function extractHeadings(root: HastRoot): HeadingMetadata[] {
+  const headings: HeadingMetadata[] = [];
 
   visit(root, 'element', (node) => {
     const depth = getHeadingDepth(node.tagName);
@@ -46,10 +55,25 @@ function extractToc(root: HastRoot): TocItem[] {
       return;
     }
 
-    toc.push({ depth, text, id });
+    headings.push({
+      index: headings.length,
+      depth,
+      text,
+      id,
+      hasCustomId: isCustomHeadingId(node.properties.dataHeadingCustomId),
+    });
+    delete node.properties.dataHeadingCustomId;
   });
 
-  return toc;
+  return headings;
+}
+
+function extractToc(headings: HeadingMetadata[]): TocItem[] {
+  return headings.map((heading) => ({
+    depth: heading.depth,
+    text: heading.text,
+    id: heading.id,
+  }));
 }
 
 function extractExcerpt(root: HastRoot): string | null {
@@ -104,18 +128,21 @@ export async function renderMarkdownDocumentInternal(
   const processor = createMarkdownProcessorInternal({
     ...options,
     emitDiagnostic: collector.emit,
+    preserveHeadingCustomIdMarker: true,
   });
 
   const parsed = processor.parse(markdown);
   const root: HastRoot = await processor.run(parsed);
-  const html = String(processor.stringify(root));
 
+  const headings = extractHeadings(root);
+  const html = String(processor.stringify(root));
   const wordCount = countWords(root);
 
   return {
     html,
     diagnostics: collector.diagnostics,
-    toc: extractToc(root),
+    toc: extractToc(headings),
+    headings,
     excerpt: extractExcerpt(root),
     wordCount,
     estimatedReadingMinutes: estimateReadingMinutes(wordCount),

@@ -20,6 +20,14 @@ const baseAttrs = defaultSchema.attributes ?? {};
 const baseStar = baseAttrs['*'] ?? [];
 const baseSpan = baseAttrs.span ?? [];
 const baseDiv = baseAttrs.div ?? [];
+const baseCode = baseAttrs.code ?? [];
+const baseButton = baseAttrs.button ?? [];
+const baseH1 = baseAttrs.h1 ?? [];
+const baseH2 = baseAttrs.h2 ?? [];
+const baseH3 = baseAttrs.h3 ?? [];
+const baseH4 = baseAttrs.h4 ?? [];
+const baseH5 = baseAttrs.h5 ?? [];
+const baseH6 = baseAttrs.h6 ?? [];
 const baseTags = defaultSchema.tagNames ?? [];
 const calloutClassNames = [
   'callout',
@@ -34,14 +42,27 @@ const calloutClassNames = [
   'callout-important',
   'callout-title',
   'chart-mount',
+  'code-block',
+  'code-block-title',
+  'code-block-copyable',
 ] as const;
+const buttonClassNames = ['code-block-copy-button'] as const;
 
 export const markdownSanitizeSchema: Schema = {
   ...defaultSchema,
+  tagNames: [...baseTags, 'button'],
   attributes: {
     ...baseAttrs,
     '*': [...baseStar, 'className'],
     span: [...baseSpan, 'style'],
+    code: [...baseCode, 'className', 'dataCodeCopyTarget', 'dataCodeLineHighlights', 'dataCodeLineNumbers'],
+    button: [...baseButton, ['className', ...buttonClassNames], 'type', 'dataCodeCopy', 'dataCodeCopyTarget'],
+    h1: [...baseH1, 'dataHeadingCustomId'],
+    h2: [...baseH2, 'dataHeadingCustomId'],
+    h3: [...baseH3, 'dataHeadingCustomId'],
+    h4: [...baseH4, 'dataHeadingCustomId'],
+    h5: [...baseH5, 'dataHeadingCustomId'],
+    h6: [...baseH6, 'dataHeadingCustomId'],
     div: [
       ...baseDiv,
       ['className', ...calloutClassNames],
@@ -86,7 +107,7 @@ const svgSharedAttributes = [
  */
 export const schemaWithSvg: Schema = {
   ...markdownSanitizeSchema,
-  tagNames: [...baseTags, ...svgTags],
+  tagNames: [...(markdownSanitizeSchema.tagNames ?? []), ...svgTags],
   attributes: {
     ...(markdownSanitizeSchema.attributes ?? {}),
     div: [

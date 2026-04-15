@@ -1,6 +1,8 @@
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeKatex from 'rehype-katex';
+import rehypeCodeBlockTitles from './rehypeCodeBlockTitles.js';
+import rehypeCodeLineHighlights from './rehypeCodeLineHighlights.js';
 import rehypeRaw from 'rehype-raw';
 import rehypeChartBlocksInternal from './rehypeChartBlocksInternal.js';
 import rehypeCdnImagesInternal from './rehypeCdnImagesInternal.js';
@@ -13,18 +15,32 @@ import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import remarkRehype from 'remark-rehype';
 import type { Root as HastRoot } from 'hast';
+import { visit } from 'unist-util-visit';
 import type { Root as MdastRoot } from 'mdast';
 import type { Processor } from 'unified';
 import { unified } from 'unified';
 import type { RenderMarkdownOptions } from '../types.js';
 import { remarkHeadingIds } from './headingIdsRemark.js';
 import { remarkCallouts } from './remarkCallouts.js';
+import { remarkCodeBlockTitles } from './remarkCodeBlockTitles.js';
 import type { DiagnosticEmitter } from './diagnostics.js';
 import { markdownSanitizeSchema } from './sanitizeSchema.js';
 
 type InternalOptions = RenderMarkdownOptions & {
   emitDiagnostic?: DiagnosticEmitter;
+  preserveHeadingCustomIdMarker?: boolean;
 };
+
+function rehypeStripHeadingCustomIdMarker() {
+  return (tree: HastRoot): undefined => {
+    visit(tree, 'element', (node) => {
+      if (!/^h[1-6]$/.test(node.tagName)) {
+        return;
+      }
+      delete node.properties.dataHeadingCustomId;
+    });
+  };
+}
 
 /**
  * Build the default browser-safe unified processor used by public APIs.
@@ -42,6 +58,7 @@ export function createMarkdownProcessorInternal(
     .use(remarkMath)
     .use(remarkHeadingIds)
     .use(remarkCallouts)
+    .use(remarkCodeBlockTitles)
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeRaw);
 
@@ -52,13 +69,19 @@ export function createMarkdownProcessorInternal(
   }
 
   processor
+    .use(rehypeCodeBlockTitles)
     .use(rehypeKatex, { output: 'html' })
     .use(rehypeSanitize, markdownSanitizeSchema)
     .use(rehypeSlug)
     .use(rehypeAutolinkHeadings, { behavior: 'wrap' })
     .use(rehypeHighlight)
-    .use(rehypeCdnImagesInternal, options)
-    .use(rehypeStringify);
+    .use(rehypeCodeLineHighlights);
+
+  if (!options?.preserveHeadingCustomIdMarker) {
+    processor.use(rehypeStripHeadingCustomIdMarker);
+  }
+
+  processor.use(rehypeCdnImagesInternal, options).use(rehypeStringify);
 
   return processor;
 }

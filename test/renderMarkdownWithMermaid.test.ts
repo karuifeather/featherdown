@@ -18,6 +18,38 @@ describe('renderMarkdownToHtmlWithMermaid', () => {
     );
   });
 
+  it('keeps titled non-mermaid code fences as highlighted code blocks in the mermaid path', async () => {
+    const md = ['```ts title="example.ts"', 'const value = 1;', '```', ''].join('\n');
+    const html = await renderMarkdownToHtmlWithMermaid(md);
+    expect(html).toContain('<div class="code-block"><div class="code-block-title">example.ts</div><pre><code class="language-ts">');
+    expect(html).toMatch(/hljs-keyword/);
+  });
+
+  it('supports line highlight ranges for ordinary non-mermaid code fences in the mermaid path', async () => {
+    const md = ['```ts {2}', 'const a = 1;', 'const b = 2;', '```', ''].join('\n');
+    const html = await renderMarkdownToHtmlWithMermaid(md);
+    expect(html).toContain('<span class="code-line code-line-highlighted"><span class="hljs-keyword">const</span> b = <span class="hljs-number">2</span>;</span>');
+    expect(html).toContain('<span class="code-line"><span class="hljs-keyword">const</span> a = <span class="hljs-number">1</span>;</span>');
+  });
+
+  it('supports line numbers for ordinary non-mermaid code fences in the mermaid path', async () => {
+    const md = ['```ts showLineNumbers', 'const a = 1;', 'const b = 2;', '```', ''].join('\n');
+    const html = await renderMarkdownToHtmlWithMermaid(md);
+    expect(html).toContain('<code class="language-ts code-line-numbered">');
+    expect(html).toContain('<span class="code-line-number">1</span>');
+    expect(html).toContain('<span class="code-line-number">2</span>');
+    expect(html).toMatch(/hljs-keyword/);
+  });
+
+  it('supports copy button markup for ordinary non-mermaid code fences in the mermaid path', async () => {
+    const md = ['```ts showCopyButton', 'const a = 1;', '```', ''].join('\n');
+    const html = await renderMarkdownToHtmlWithMermaid(md);
+    expect(html).toContain('<div class="code-block code-block-copyable">');
+    expect(html).toContain('<button type="button" class="code-block-copy-button" data-code-copy=""');
+    expect(html).toContain('<code class="language-ts" data-code-copy-target="code-copy-target-1">');
+    expect(html).toMatch(/hljs-keyword/);
+  });
+
   it('keeps image rewriting behavior in the mermaid path', async () => {
     const md = '![Logo](./images/logo.png)\n';
     const html = await renderMarkdownToHtmlWithMermaid(md, {

@@ -21,6 +21,20 @@ const baseStar = baseAttrs['*'] ?? [];
 const baseSpan = baseAttrs.span ?? [];
 const baseDiv = baseAttrs.div ?? [];
 const baseTags = defaultSchema.tagNames ?? [];
+const calloutClassNames = [
+  'callout',
+  'callout-note',
+  'callout-tip',
+  'callout-warning',
+  'callout-info',
+  'callout-success',
+  'callout-danger',
+  'callout-error',
+  'callout-caution',
+  'callout-important',
+  'callout-title',
+  'chart-mount',
+] as const;
 
 export const markdownSanitizeSchema: Schema = {
   ...defaultSchema,
@@ -30,7 +44,7 @@ export const markdownSanitizeSchema: Schema = {
     span: [...baseSpan, 'style'],
     div: [
       ...baseDiv,
-      ['className', 'chart-mount'],
+      ['className', ...calloutClassNames],
       ['dataChart', ...CHART_BLOCK_TYPES],
       'dataChartData',
     ],
@@ -79,7 +93,7 @@ export const schemaWithSvg: Schema = {
       ...baseDiv,
       'style',
       'xmlns',
-      ['className', 'chart-mount'],
+      ['className', ...calloutClassNames],
       ['dataChart', ...CHART_BLOCK_TYPES],
       'dataChartData',
     ],

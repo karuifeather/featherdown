@@ -7,6 +7,7 @@ import rehypeCdnImagesInternal from './rehypeCdnImagesInternal.js';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeSlug from 'rehype-slug';
 import rehypeStringify from 'rehype-stringify';
+import remarkDirective from 'remark-directive';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
@@ -17,6 +18,7 @@ import type { Processor } from 'unified';
 import { unified } from 'unified';
 import type { RenderMarkdownOptions } from '../types.js';
 import { remarkHeadingIds } from './headingIdsRemark.js';
+import { remarkCallouts } from './remarkCallouts.js';
 import type { DiagnosticEmitter } from './diagnostics.js';
 import { markdownSanitizeSchema } from './sanitizeSchema.js';
 
@@ -36,8 +38,10 @@ export function createMarkdownProcessorInternal(
   const processor = unified()
     .use(remarkParse)
     .use(remarkGfm)
+    .use(remarkDirective)
     .use(remarkMath)
     .use(remarkHeadingIds)
+    .use(remarkCallouts)
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeRaw);
 

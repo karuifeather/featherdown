@@ -1,5 +1,4 @@
-import { createMarkdownProcessorInternal } from './internal/createMarkdownProcessorInternal.js';
-import { createDiagnosticCollector } from './internal/diagnostics.js';
+import { renderMarkdownDocumentInternal } from './internal/renderMarkdownDocumentInternal.js';
 import type { RenderDiagnostic, RenderMarkdownOptions } from './types.js';
 
 /**
@@ -12,12 +11,7 @@ export async function renderMarkdown(
   markdown: string,
   options?: RenderMarkdownOptions,
 ): Promise<{ html: string; diagnostics: RenderDiagnostic[] }> {
-  const collector = createDiagnosticCollector();
-  const processor = createMarkdownProcessorInternal({
-    ...options,
-    emitDiagnostic: collector.emit,
-  });
-  const file = await processor.process(markdown);
-  return { html: String(file), diagnostics: collector.diagnostics };
+  const result = await renderMarkdownDocumentInternal(markdown, options);
+  return { html: result.html, diagnostics: result.diagnostics };
 }
 

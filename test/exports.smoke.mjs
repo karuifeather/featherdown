@@ -6,6 +6,7 @@ const nodeOnly = await import('../dist/node.js');
 
 assert.equal(typeof root.renderMarkdownToHtml, 'function');
 assert.equal(typeof root.renderMarkdown, 'function');
+assert.equal(typeof root.renderMarkdownDocument, 'function');
 assert.equal(typeof root.createMarkdownProcessor, 'function');
 assert.equal(typeof root.rehypeChartBlocks, 'function');
 assert.equal(typeof root.rehypeCdnImages, 'function');

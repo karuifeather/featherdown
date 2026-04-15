@@ -54,3 +54,55 @@ export type RenderDiagnostic = {
   source: 'chart' | 'images';
 };
 
+/**
+ * Heading entry extracted from final rendered document structure.
+ */
+export type TocItem = {
+  /**
+   * Final heading level from 1 to 6.
+   */
+  depth: number;
+  /**
+   * Final heading text content.
+   */
+  text: string;
+  /**
+   * Final heading id used in rendered HTML.
+   */
+  id: string;
+};
+
+/**
+ * Full render output for publishing workflows.
+ */
+export type RenderMarkdownDocumentResult = {
+  /**
+   * Sanitized rendered HTML.
+   */
+  html: string;
+  /**
+   * Non-fatal render diagnostics.
+   */
+  diagnostics: RenderDiagnostic[];
+  /**
+   * Table of contents extracted from rendered headings in document order.
+   * Entries are included only when a final heading id exists.
+   */
+  toc: TocItem[];
+  /**
+   * First meaningful plain-text excerpt from rendered `p`, `blockquote`,
+   * or `li` content, in document order. Returns `null` when no such content
+   * exists.
+   */
+  excerpt: string | null;
+  /**
+   * Approximate plain-text word count derived from rendered document text.
+   */
+  wordCount: number;
+  /**
+   * Estimated reading time in whole minutes using a simple words-per-minute
+   * heuristic. Returns 0 only when no readable text is present.
+   */
+  estimatedReadingMinutes: number;
+};
+

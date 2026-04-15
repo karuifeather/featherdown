@@ -15,7 +15,14 @@ export { rehypeChartBlocks } from './rehypeChartBlocks.js';
 export { rehypeCdnImages } from './rehypeCdnImages.js';
 /** Render Markdown and return HTML plus non-fatal diagnostics. */
 export { renderMarkdown } from './renderMarkdown.js';
+/** Render Markdown and return HTML plus publishing metadata. */
+export { renderMarkdownDocument } from './renderMarkdownDocument.js';
 /** Render Markdown and return only sanitized HTML. */
 export { renderMarkdownToHtml } from './renderMarkdownToHtml.js';
 /** Shared public rendering option and diagnostic types. */
-export type { RenderDiagnostic, RenderMarkdownOptions } from './types.js';
+export type {
+  RenderDiagnostic,
+  RenderMarkdownDocumentResult,
+  RenderMarkdownOptions,
+  TocItem,
+} from './types.js';

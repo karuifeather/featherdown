@@ -41,6 +41,8 @@ Publishing uses OpenID Connect (`id-token: write` in the workflow). Do not add a
 
 If the npm job fails after fixing configuration, re-run the failed workflow once the npm settings match the repository and workflow name.
 
+Action runtime deprecation notices in the job log are separate from publish failures: read the **Publish to npm** step output for the npm error (trusted publisher mismatch, wrong workflow filename, version already on the registry, and so on).
+
 ## One-time setup: JSR and GitHub
 
 1. Create or select the JSR scope and package (for example `@karuifeather/featherdown` as in `deno.json`).

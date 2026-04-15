@@ -10,4 +10,5 @@ export const CHART_BLOCK_TYPES = [
   'scatter',
 ] as const;
 
+/** Lookup set for fast chart type membership checks. */
 export const CHART_BLOCK_TYPE_SET: ReadonlySet<string> = new Set(CHART_BLOCK_TYPES);

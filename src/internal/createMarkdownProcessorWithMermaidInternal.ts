@@ -17,6 +17,12 @@ import rehypeCdnImagesInternal from './rehypeCdnImagesInternal.js';
 import { remarkHeadingIds } from './headingIdsRemark.js';
 import { schemaWithSvg } from './sanitizeSchema.js';
 
+/**
+ * Build the Node-focused unified processor that includes Mermaid rendering.
+ *
+ * Internal helper for the `node` subpath; enables inline SVG Mermaid output
+ * with a sanitizer schema that permits the required SVG elements.
+ */
 export function createMarkdownProcessorWithMermaidInternal(
   options?: RenderMarkdownOptions,
 ) {

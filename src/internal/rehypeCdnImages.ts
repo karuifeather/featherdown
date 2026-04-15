@@ -34,6 +34,10 @@ function ensureInlineClass(node: Element): void {
   node.properties.className = classes;
 }
 
+/**
+ * Rehype plugin that annotates image classes and rewrites image URLs via
+ * optional manifest maps.
+ */
 export default function rehypeCdnImages(options?: RehypeCdnImagesOptions) {
   const kind = options?.kind;
   const slug = options?.slug;

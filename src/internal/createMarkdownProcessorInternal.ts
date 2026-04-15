@@ -24,6 +24,12 @@ type InternalOptions = RenderMarkdownOptions & {
   emitDiagnostic?: DiagnosticEmitter;
 };
 
+/**
+ * Build the default browser-safe unified processor used by public APIs.
+ *
+ * Internal helper that wires remark/rehype plugins for math, highlighting,
+ * sanitization, heading ids, chart placeholders, and image rewriting.
+ */
 export function createMarkdownProcessorInternal(
   options?: InternalOptions,
 ): Processor<MdastRoot, MdastRoot, HastRoot> {

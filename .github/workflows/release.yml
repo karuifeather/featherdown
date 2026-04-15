@@ -45,9 +45,6 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Use npm with trusted publishing support
-        run: npm install -g npm@^11.5.1
-
       - name: Install dependencies
         run: npm ci
 
@@ -55,7 +52,7 @@ jobs:
         run: npm run build
 
       - name: Publish to npm
-        run: npm publish --provenance --access public --ignore-scripts
+        run: npx --yes npm@11.5.1 publish --provenance --access public --ignore-scripts
 
   publish-jsr:
     name: Publish to JSR (OIDC)

@@ -56,6 +56,87 @@ describe('renderMarkdownToHtml', () => {
     expect(html).not.toContain('evil');
   });
 
+  it('rewrites relative image paths from manifest.map', async () => {
+    const md = '![Logo](./images/logo.png)\n';
+    const html = await renderMarkdownToHtml(md, {
+      kind: 'post',
+      slug: 'hello-world',
+      manifest: {
+        map: {
+          'post/hello-world/images/logo.png': {
+            url: 'https://cdn.example.com/blog/hello-world/logo.hash.png',
+          },
+        },
+      },
+    });
+    expect(html).toBe(
+      '<p><img src="https://cdn.example.com/blog/hello-world/logo.hash.png" alt="Logo" class="markdown-inline-img"></p>',
+    );
+  });
+
+  it('keeps remote image src when no remote mapping exists', async () => {
+    const md = '![CDN](https://img.example.com/a.png)\n';
+    const html = await renderMarkdownToHtml(md, {
+      kind: 'post',
+      slug: 'hello-world',
+    });
+    expect(html).toBe(
+      '<p><img src="https://img.example.com/a.png" alt="CDN" class="markdown-inline-img"></p>',
+    );
+  });
+
+  it('rewrites remote image src through manifest.remote', async () => {
+    const md = '![CDN](https://img.example.com/a.png)\n';
+    const html = await renderMarkdownToHtml(md, {
+      kind: 'post',
+      slug: 'hello-world',
+      manifest: {
+        remote: {
+          'https://img.example.com/a.png': {
+            url: 'https://cdn.example.com/remote/a.optimized.png',
+          },
+        },
+      },
+    });
+    expect(html).toBe(
+      '<p><img src="https://cdn.example.com/remote/a.optimized.png" alt="CDN" class="markdown-inline-img"></p>',
+    );
+  });
+
+  it('does not rewrite root-relative image src', async () => {
+    const md = '![Root](/images/logo.png)\n';
+    const html = await renderMarkdownToHtml(md, {
+      kind: 'post',
+      slug: 'hello-world',
+      manifest: {
+        map: {
+          'post/hello-world/images/logo.png': {
+            url: 'https://cdn.example.com/blog/hello-world/logo.hash.png',
+          },
+        },
+      },
+    });
+    expect(html).toBe(
+      '<p><img src="/images/logo.png" alt="Root" class="markdown-inline-img"></p>',
+    );
+  });
+
+  it('adds image class only when kind or slug is missing', async () => {
+    const md = '![Logo](./images/logo.png)\n';
+    const html = await renderMarkdownToHtml(md, {
+      manifest: {
+        map: {
+          'post/hello-world/images/logo.png': {
+            url: 'https://cdn.example.com/blog/hello-world/logo.hash.png',
+          },
+        },
+      },
+    });
+    expect(html).toBe(
+      '<p><img src="./images/logo.png" alt="Logo" class="markdown-inline-img"></p>',
+    );
+  });
+
   it('turns a valid chart fence into a chart-mount div in final HTML', async () => {
     const md = ['```chart-line', '{"labels":["a"],"datasets":[]}', '```', ''].join('\n');
     const html = await renderMarkdownToHtml(md);

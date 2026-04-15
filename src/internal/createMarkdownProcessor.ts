@@ -3,6 +3,7 @@ import rehypeHighlight from 'rehype-highlight';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import rehypeChartBlocks from './rehypeChartBlocks.js';
+import rehypeCdnImages from './rehypeCdnImages.js';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeSlug from 'rehype-slug';
 import rehypeStringify from 'rehype-stringify';
@@ -14,7 +15,18 @@ import { unified } from 'unified';
 import { remarkHeadingIds } from './headingIdsRemark.js';
 import { markdownSanitizeSchema } from './sanitizeSchema.js';
 
-export function createMarkdownProcessor() {
+type RenderManifest = {
+  map?: Record<string, { url: string }>;
+  remote?: Record<string, { url: string }>;
+};
+
+type CreateMarkdownProcessorOptions = {
+  kind?: string;
+  slug?: string;
+  manifest?: RenderManifest;
+};
+
+export function createMarkdownProcessor(options?: CreateMarkdownProcessorOptions) {
   return (
     unified()
       .use(remarkParse)
@@ -29,6 +41,7 @@ export function createMarkdownProcessor() {
       .use(rehypeSlug)
       .use(rehypeAutolinkHeadings, { behavior: 'wrap' })
       .use(rehypeHighlight)
+      .use(rehypeCdnImages, options)
       .use(rehypeStringify)
   );
 }

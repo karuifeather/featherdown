@@ -1,7 +1,6 @@
 /**
- * Returns a stable string used for logging and smoke tests.
- * This is a wiring check until the public API is defined.
+ * Stable identifier for this library. Intended for diagnostics and smoke tests.
  */
-export function runtimeLabel(): string {
+export function libraryId(): string {
   return 'blog-pipeline';
 }

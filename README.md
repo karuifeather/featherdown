@@ -22,7 +22,11 @@ Typical flow: `parseMarkdownFile` for metadata, then `renderMarkdownToHtml` on `
 
 ## Rendering behavior
 
-The sanitizer extends the default GitHub-style schema with **`className` and `style`** on elements so KaTeX and syntax highlighting output is preserved; scripts are still stripped. Math is rendered with **`output: 'html'`** so MathML tags are avoided and the schema stays manageable. For correct math typography in a browser, load KaTeX CSS in your app.
+`rehype-sanitize` uses the GitHub-style default schema, extended here with **`className` on all allowed elements** (needed for KaTeX, highlight.js, and classed raw HTML) and **`style` on `span` only** (KaTeX’s HTML output uses inline styles on spans). Scripts are stripped.
+
+Heading ids: **`rehype-slug` runs after sanitization**, so ordinary headings get slug ids such as `section-one` with matching `href="#section-one"`. A custom ` {#my-id}` is applied earlier and is subject to the sanitizer’s id handling, so the final `id` and `href` use the `user-content-` prefix (for example `user-content-my-id`).
+
+Math uses KaTeX **`output: 'html'`** so MathML is not emitted. Load KaTeX CSS in your app for correct typography.
 
 CDN rewrites, diagrams, charts, and pluggable processors are **not** included.
 

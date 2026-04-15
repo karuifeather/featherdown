@@ -57,6 +57,24 @@ const html = await renderMarkdownToHtml("## Hello **world**");
 
 The default entry is browser-safe and does **not** include Mermaid rendering.
 
+## Which API should I use?
+
+| If you need... | Use... |
+| --- | --- |
+| Just sanitized HTML output | `renderMarkdownToHtml` |
+| HTML plus non-fatal warnings | `renderMarkdown` |
+| HTML plus publishing metadata (`toc`, `headings`, excerpt, reading stats) | `renderMarkdownDocument` |
+| Direct unified processor access with featherdown defaults | `createMarkdownProcessor` |
+| A custom unified pipeline with focused helpers | `rehypeChartBlocks`, `rehypeCdnImages` |
+| Mermaid-to-inline-SVG rendering in Node publishing flows | `renderMarkdownToHtmlWithMermaid` from `featherdown/node` |
+
+Rule of thumb:
+
+- Start with `renderMarkdownToHtml`.
+- Move to `renderMarkdown` when content warnings matter.
+- Move to `renderMarkdownDocument` when you need TOC/sidebar/preview metadata.
+- Use `createMarkdownProcessor` only when you need lower-level unified control.
+
 ## Common Use Cases
 
 ### Render Markdown to HTML
@@ -92,9 +110,25 @@ console.log(diagnostics);
 
 Diagnostics are intended for developer feedback, not end-user rendering.
 
+### Render a docs/blog page bundle
+
+Use `renderMarkdownDocument` to produce HTML and page metadata in one pass.
+
+```ts
+import { renderMarkdownDocument } from "featherdown";
+
+const page = await renderMarkdownDocument(markdown);
+
+const html = page.html;
+const sidebarItems = page.headings;
+const legacyToc = page.toc;
+const previewText = page.excerpt;
+const readingMinutes = page.estimatedReadingMinutes;
+```
+
 ### Render HTML with document metadata
 
-Use `renderMarkdownDocument` when publishing workflows need HTML plus table-of-contents data, excerpt text, and reading stats from the final browser-safe output.
+Use `renderMarkdownDocument` when publishing workflows need HTML plus heading metadata, excerpt text, and reading stats from the final browser-safe output.
 
 ```ts
 import { renderMarkdownDocument } from "featherdown";
@@ -110,6 +144,7 @@ Body text here.
 
 console.log(document.html);
 console.log(document.toc);
+console.log(document.headings);
 console.log(document.excerpt);
 console.log(document.wordCount, document.estimatedReadingMinutes);
 ```
@@ -117,11 +152,14 @@ console.log(document.wordCount, document.estimatedReadingMinutes);
 Returned metadata:
 
 - `toc`: ordered heading list with `depth`, final `text`, and final `id`
+- `headings`: richer ordered heading metadata with `index`, `depth`, final `text`, final `id`, and `hasCustomId`
 - `excerpt`: first meaningful plain-text content from rendered `p`, `blockquote`, or `li`, or `null`
 - `wordCount`: deterministic plain-text word count from rendered document text
 - `estimatedReadingMinutes`: whole-minute estimate from word count (minimum `1` when text exists, `0` when none)
 
-The metadata is derived from the same processed document structure that produces the final HTML, so TOC ids and text stay aligned with rendered output.
+`toc` stays intentionally compact for backwards-compatible navigation use, while `headings` is better for richer sidebars, heading-aware tooling, and workflows that need to detect explicit custom heading ids.
+
+The metadata is derived from the same processed document structure that produces the final HTML, so heading ids and text stay aligned with rendered output.
 
 Common uses include TOC sidebars, preview cards, and reading-time badges.
 
@@ -141,6 +179,21 @@ tags:
 
 console.log(result.frontMatter);
 console.log(result.content);
+```
+
+### Publish styled code blocks (title + ranges + numbers + copy hooks)
+
+```ts
+import { renderMarkdownToHtml } from "featherdown";
+
+const markdown = `
+\`\`\`ts title="example.ts" {2} showLineNumbers showCopyButton
+const a = 1;
+const b = 2;
+\`\`\`
+`;
+
+const html = await renderMarkdownToHtml(markdown);
 ```
 
 ## Publishing Features
@@ -166,6 +219,104 @@ Rendered HTML shape:
 ```
 
 `featherdown` does not bundle a chart runtime. It only emits mount markup that your app can hydrate later.
+
+### Code block titles
+
+Fenced code blocks can include a title using `title="..."` metadata.
+
+````md
+```ts title="example.ts"
+const value = 1;
+```
+````
+
+Emitted HTML contract:
+
+```html
+<div class="code-block">
+  <div class="code-block-title">example.ts</div>
+  <pre><code class="hljs language-ts">...</code></pre>
+</div>
+```
+
+Title text is treated as plain text, and styling of `code-block` / `code-block-title` is left to the consuming application.
+
+### Code line highlights
+
+Fenced code blocks can mark highlighted lines using brace metadata:
+
+- `{2}`
+- `{2,4-5}`
+- `{1-3,6}`
+
+Highlighted lines receive `code-line-highlighted` in the rendered code, with minimal line wrappers:
+
+```html
+<pre><code class="hljs language-ts">
+  <span class="code-line">...</span>
+  <span class="code-line code-line-highlighted">...</span>
+</code></pre>
+```
+
+When a code block also has `title="..."`, title markup and line highlighting compose in the same block. Styling is left to the consuming application.
+
+### Code line numbers
+
+Fenced code blocks can opt into line numbers with `showLineNumbers`.
+
+````md
+```ts showLineNumbers
+const a = 1;
+const b = 2;
+```
+````
+
+Emitted HTML contract:
+
+```html
+<pre><code class="hljs language-ts code-line-numbered">
+  <span class="code-line">
+    <span class="code-line-number">1</span>
+    ...
+  </span>
+  <span class="code-line code-line-highlighted">
+    <span class="code-line-number">2</span>
+    ...
+  </span>
+</code></pre>
+```
+
+Line number styling is left to the consuming application. Line numbers compose with both `title="..."` and `{...}` line highlight metadata on the same fenced code block.
+
+### Code copy button markup
+
+Fenced code blocks can opt into copy-button markup with `showCopyButton` or `copyButton`.
+
+````md
+```ts title="example.ts" {2} showLineNumbers showCopyButton
+const a = 1;
+const b = 2;
+```
+````
+
+Emitted HTML contract:
+
+```html
+<div class="code-block code-block-copyable">
+  <div class="code-block-title">example.ts</div>
+  <button
+    type="button"
+    class="code-block-copy-button"
+    data-code-copy
+    data-code-copy-target="code-copy-target-1"
+  >
+    Copy
+  </button>
+  <pre><code data-code-copy-target="code-copy-target-1" class="hljs language-ts code-line-numbered">...</code></pre>
+</div>
+```
+
+Styling and clipboard behavior are left to the consuming application. This package emits only HTML contract hooks and does not include built-in clipboard runtime logic.
 
 ### Admonitions / callouts
 
@@ -226,6 +377,28 @@ const html = await renderMarkdownToHtml("![Logo](./images/logo.png)", {
 
 Relative image rewriting is optional and entirely caller-driven. No CDN logic or fetch behavior is bundled into the package.
 
+## Styling hooks
+
+featherdown emits stable classes/data hooks you can style in your own CSS:
+
+- callouts: `callout`, `callout-<type>`, `callout-title`
+- code wrappers/titles: `code-block`, `code-block-title`
+- highlighted lines: `code-line`, `code-line-highlighted`
+- numbered lines: `code-line-numbered`, `code-line-number`
+- copy hooks: `code-block-copyable`, `code-block-copy-button`, `data-code-copy`, `data-code-copy-target`
+- chart placeholders: `chart-mount`
+- markdown images: `markdown-inline-img`
+
+These are contract hooks, not a built-in theme system. You own the final visual design.
+
+## Common publishing patterns
+
+- **Basic post page**: `renderMarkdownToHtml` + app-level CSS.
+- **Editorial QA**: `renderMarkdown` and surface `diagnostics` in author tooling.
+- **Docs/blog navigation**: `renderMarkdownDocument` and drive sidebars from `headings`.
+- **CDN assets**: pass `kind`, `slug`, and `manifest.map`/`manifest.remote`.
+- **Static Mermaid output**: use `featherdown/node` in a trusted Node build step.
+
 ## Advanced Usage
 
 ### Create the default processor directly
@@ -277,6 +450,12 @@ const html = await renderMarkdownToHtmlWithMermaid(
 Use this entry in Node publishing environments where Playwright + Chromium dependencies are acceptable.
 
 The Mermaid subpath is npm-focused and is **not** part of the JSR export surface.
+
+## Runtime boundaries
+
+- `featherdown` default entry is browser-safe and Mermaid-free.
+- `featherdown/node` is Node-focused and includes Mermaid rendering dependencies.
+- JSR export surface is default-entry focused; Mermaid entry is npm subpath only.
 
 ## CSS / Asset Expectations
 

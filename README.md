@@ -16,6 +16,8 @@ Requires **Node.js 18 or later**.
 
 - **`renderMarkdown(markdown: string, options?: { kind?: string; slug?: string; manifest?: { map?: Record<string, { url: string }>; remote?: Record<string, { url: string }> } }): Promise<{ html: string; diagnostics: RenderDiagnostic[] }>`** — Same renderer as `renderMarkdownToHtml`, but also returns non-fatal **warning diagnostics** intended for developer feedback (not end-user rendering).
 
+- **`createMarkdownProcessor(options?: RenderMarkdownOptions): Processor`** — Creates the underlying browser-safe unified processor used by the render helpers. Useful if you want to integrate the pipeline into an existing unified setup.
+
 - **`parseMarkdownFile(raw: string): { frontMatter: Record<string, unknown>; content: string }`** — Parses optional YAML between leading `---` fences. If there is no valid block, returns `{ frontMatter: {}, content: raw }`. Invalid YAML throws an error with a clear message.
 
 - **`libraryId(): string`** — Stable package identifier for diagnostics and tests.
@@ -31,6 +33,8 @@ Typical flow: `parseMarkdownFile` for metadata, then `renderMarkdownToHtml` on `
 **Image rewriting (optional):** pass `kind`, `slug`, and a `manifest` to rewrite relative image paths and selected remote URLs from caller-provided manifest data. The renderer does not fetch anything and does not bundle CDN logic.
 
 **Diagnostics (warnings):** currently emitted for invalid JSON in supported `chart-…` fences and for relative image manifest misses when `kind` and `slug` are provided.
+
+**Advanced use:** the package also exports `rehypeChartBlocks` and `rehypeCdnImages` so you can reuse those behaviors in custom pipelines without using the full renderer.
 
 Heading ids: **`rehype-slug` runs after sanitization**, so ordinary headings get slug ids such as `section-one` with matching `href="#section-one"`. A custom ` {#my-id}` is applied earlier and is subject to the sanitizer’s id handling, so the final `id` and `href` use the `user-content-` prefix (for example `user-content-my-id`).
 

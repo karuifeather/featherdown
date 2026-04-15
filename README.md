@@ -10,13 +10,21 @@ npm install blog-pipeline
 
 Requires **Node.js 18 or later**.
 
+For Mermaid rendering in Node, install Playwright Chromium once:
+
+```bash
+npx playwright install chromium
+```
+
 ## API
 
-- **`renderMarkdownToHtml(markdown: string, options?: { kind?: string; slug?: string; manifest?: { map?: Record<string, { url: string }>; remote?: Record<string, { url: string }> } }): Promise<string>`** — Runs the browser-safe base pipeline (GitHub Flavored Markdown, math via KaTeX with HTML output, fenced code highlighting, chart JSON placeholders, heading slugs and autolinks, raw HTML passed through `rehype-raw` then **`rehype-sanitize`**). Returns a complete HTML fragment string (not a full document).
+- **`renderMarkdownToHtml(markdown: string, options?: { kind?: string; slug?: string; manifest?: { map?: Record<string, { url: string }>; remote?: Record<string, { url: string }> } }): Promise<string>`** — Runs the default browser-safe pipeline (GitHub Flavored Markdown, math via KaTeX with HTML output, fenced code highlighting, chart JSON placeholders, heading slugs and autolinks, raw HTML passed through `rehype-raw` then **`rehype-sanitize`**). Returns a complete HTML fragment string (not a full document).
 
 - **`renderMarkdown(markdown: string, options?: { kind?: string; slug?: string; manifest?: { map?: Record<string, { url: string }>; remote?: Record<string, { url: string }> } }): Promise<{ html: string; diagnostics: RenderDiagnostic[] }>`** — Same renderer as `renderMarkdownToHtml`, but also returns non-fatal **warning diagnostics** intended for developer feedback (not end-user rendering).
 
 - **`createMarkdownProcessor(options?: RenderMarkdownOptions): Processor`** — Creates the underlying browser-safe unified processor used by the render helpers. Useful if you want to integrate the pipeline into an existing unified setup.
+
+- **`renderMarkdownToHtmlWithMermaid(markdown: string, options?: RenderMarkdownOptions): Promise<string>`** — Node-only Mermaid path, exported from the package subpath `blog-pipeline/node`. This keeps Mermaid/Playwright coupling out of the default browser-safe entry.
 
 - **`parseMarkdownFile(raw: string): { frontMatter: Record<string, unknown>; content: string }`** — Parses optional YAML between leading `---` fences. If there is no valid block, returns `{ frontMatter: {}, content: raw }`. Invalid YAML throws an error with a clear message.
 
@@ -35,6 +43,8 @@ Typical flow: `parseMarkdownFile` for metadata, then `renderMarkdownToHtml` on `
 **Diagnostics (warnings):** currently emitted for invalid JSON in supported `chart-…` fences and for relative image manifest misses when `kind` and `slug` are provided.
 
 **Advanced use:** the package also exports `rehypeChartBlocks` and `rehypeCdnImages` so you can reuse those behaviors in custom pipelines without using the full renderer.
+
+**Node-only Mermaid entry:** import from `blog-pipeline/node` when you need inline SVG Mermaid rendering. It uses Node tooling and is better suited to trusted publishing workflows than arbitrary untrusted content.
 
 Heading ids: **`rehype-slug` runs after sanitization**, so ordinary headings get slug ids such as `section-one` with matching `href="#section-one"`. A custom ` {#my-id}` is applied earlier and is subject to the sanitizer’s id handling, so the final `id` and `href` use the `user-content-` prefix (for example `user-content-my-id`).
 

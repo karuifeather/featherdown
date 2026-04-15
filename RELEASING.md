@@ -7,6 +7,7 @@ This document describes continuous integration, automated releases, and one-time
 The [CI workflow](.github/workflows/ci.yml) runs on every push and pull request. It calls a shared [validation workflow](.github/workflows/validate-reusable.yml) that:
 
 - installs dependencies with `npm ci`
+- installs Playwright Chromium (`npx playwright install --with-deps chromium`) so Mermaid-related tests can run
 - runs `npm run build`, `npm test`, `npm run lint`, `npm run typecheck`, `npm run test:exports`, and `npm pack --dry-run`
 
 Node.js 22 is used in CI (the package requires Node.js 18 or newer).

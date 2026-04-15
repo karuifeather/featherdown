@@ -1,12 +1,12 @@
 # blog-pipeline
 
-TypeScript library aimed at **Markdown-to-HTML publishing**: turning author content into HTML suitable for static sites, feeds, and similar workflows.
+TypeScript library for **Markdown-to-HTML publishing**: producing HTML from author Markdown for static sites, feeds, and related outputs.
 
-The project is **early**; rendering, plugins, and CLI are **not** shipped yet. This repository currently holds tooling, types, and a minimal entry point so development can proceed in small, reviewable steps.
+This release ships **package infrastructure only**—build, types, tests, and a minimal public entry. Conversion APIs and tooling are not included yet.
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 18 or later
 
 ## Scripts
 

@@ -3,6 +3,16 @@ import type { Root } from 'hast';
 import type { RenderMarkdownOptions } from './types.js';
 import rehypeCdnImagesInternal from './internal/rehypeCdnImagesInternal.js';
 
+/**
+ * Rehype plugin entrypoint for image class and CDN URL rewriting.
+ *
+ * Exports plugin options and a plugin that annotates image nodes and can
+ * rewrite local image sources with caller-provided manifest mappings.
+ */
+
+/**
+ * Options accepted by `rehypeCdnImages`.
+ */
 export type RehypeCdnImagesOptions = RenderMarkdownOptions;
 
 /**

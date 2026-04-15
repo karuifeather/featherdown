@@ -2,6 +2,12 @@ import { createMarkdownProcessorInternal } from './internal/createMarkdownProces
 import { createDiagnosticCollector } from './internal/diagnostics.js';
 import type { RenderDiagnostic, RenderMarkdownOptions } from './types.js';
 
+/**
+ * Render Markdown to sanitized HTML and collect non-fatal diagnostics.
+ *
+ * This entrypoint is useful when callers want warning metadata in addition to
+ * the final HTML string.
+ */
 export async function renderMarkdown(
   markdown: string,
   options?: RenderMarkdownOptions,

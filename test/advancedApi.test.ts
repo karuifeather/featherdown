@@ -13,6 +13,10 @@ describe('advanced API', () => {
     const md = [
       '## Title',
       '',
+      ':::note',
+      'Remember this',
+      ':::',
+      '',
       '![Logo](./images/logo.png)',
       '',
       '```chart-line',

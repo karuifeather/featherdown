@@ -103,6 +103,52 @@ describe('renderMarkdownDocument', () => {
     ]);
   });
 
+  it('keeps chart/image behavior unchanged when callouts are present', async () => {
+    const markdown = [
+      ':::info',
+      'Inside callout',
+      ':::',
+      '',
+      '![Logo](./images/logo.png)',
+      '',
+      '```chart-line',
+      '{"labels":["a"],"datasets":[]}',
+      '```',
+      '',
+    ].join('\n');
+
+    const result = await renderMarkdownDocument(markdown, {
+      kind: 'post',
+      slug: 'hello-world',
+      manifest: {
+        map: {
+          'post/hello-world/images/logo.png': {
+            url: 'https://cdn.example.com/blog/hello-world/logo.hash.png',
+          },
+        },
+      },
+    });
+
+    expect(result.html).toContain('<div class="callout callout-info"><div class="callout-title">Info</div>');
+    expect(result.html).toContain(
+      '<img src="https://cdn.example.com/blog/hello-world/logo.hash.png" alt="Logo" class="markdown-inline-img">',
+    );
+    expect(result.html).toContain('<div class="chart-mount" data-chart="line"');
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('renders callouts correctly through renderMarkdownDocument output and metadata', async () => {
+    const markdown = ['# Title', '', ':::note[Custom title]', 'Body text in callout.', ':::', ''].join('\n');
+    const result = await renderMarkdownDocument(markdown);
+
+    expect(result.html).toContain('<div class="callout callout-note">');
+    expect(result.html).toContain('<div class="callout-title">Custom title</div>');
+    expect(result.html).toContain('<p>Body text in callout.</p>');
+    expect(result.toc).toEqual([{ depth: 1, text: 'Title', id: 'title' }]);
+    expect(result.excerpt).toBe('Body text in callout.');
+    expect(result.diagnostics).toEqual([]);
+  });
+
   it('keeps existing render APIs behavior unchanged', async () => {
     const markdown = '# Hello\n';
     const html = await renderMarkdownToHtml(markdown);

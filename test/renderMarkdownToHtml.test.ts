@@ -56,6 +56,118 @@ describe('renderMarkdownToHtml', () => {
     expect(html).not.toContain('evil');
   });
 
+  it('renders note directives as callout containers', async () => {
+    const html = await renderMarkdownToHtml([':::note', 'Remember to install KaTeX CSS.', ':::', ''].join('\n'));
+    expect(html).toBe(
+      '<div class="callout callout-note"><div class="callout-title">Note</div><p>Remember to install KaTeX CSS.</p></div>',
+    );
+  });
+
+  it('renders tip, warning, info, success, danger, error, caution, and important directives with stable classes', async () => {
+    const html = await renderMarkdownToHtml(
+      [
+        ':::tip',
+        'Tip text',
+        ':::',
+        '',
+        ':::warning',
+        'Warning text',
+        ':::',
+        '',
+        ':::info',
+        'Info text',
+        ':::',
+        '',
+        ':::success',
+        'Success text',
+        ':::',
+        '',
+        ':::danger',
+        'Danger text',
+        ':::',
+        '',
+        ':::error',
+        'Error text',
+        ':::',
+        '',
+        ':::caution',
+        'Caution text',
+        ':::',
+        '',
+        ':::important',
+        'Important text',
+        ':::',
+        '',
+      ].join('\n'),
+    );
+    expect(html).toContain('<div class="callout callout-tip">');
+    expect(html).toContain('<div class="callout callout-warning">');
+    expect(html).toContain('<div class="callout callout-info">');
+    expect(html).toContain('<div class="callout callout-success">');
+    expect(html).toContain('<div class="callout callout-danger">');
+    expect(html).toContain('<div class="callout callout-error">');
+    expect(html).toContain('<div class="callout callout-caution">');
+    expect(html).toContain('<div class="callout callout-important">');
+  });
+
+  it('emits default title when no custom title is provided', async () => {
+    const html = await renderMarkdownToHtml([':::warning', 'Be careful.', ':::', ''].join('\n'));
+    expect(html).toBe(
+      '<div class="callout callout-warning"><div class="callout-title">Warning</div><p>Be careful.</p></div>',
+    );
+  });
+
+  it('uses custom title when provided', async () => {
+    const html = await renderMarkdownToHtml([':::note[Install CSS]', 'Remember to install KaTeX CSS.', ':::', ''].join('\n'));
+    expect(html).toBe(
+      '<div class="callout callout-note"><div class="callout-title">Install CSS</div><p>Remember to install KaTeX CSS.</p></div>',
+    );
+  });
+
+  it('renders title text as plain text', async () => {
+    const html = await renderMarkdownToHtml([':::info[Install CSS v1]', 'Body', ':::', ''].join('\n'));
+    expect(html).toContain('<div class="callout-title">Install CSS v1</div>');
+    expect(html).not.toContain('<div class="callout-title"><em>');
+    expect(html).not.toContain('<div class="callout-title"><strong>');
+  });
+
+  it('normalizes title whitespace', async () => {
+    const html = await renderMarkdownToHtml([':::note[  Install   CSS\tv1  ]', 'Body', ':::', ''].join('\n'));
+    expect(html).toContain('<div class="callout-title">Install CSS v1</div>');
+  });
+
+  it('escapes unusual title characters safely', async () => {
+    const html = await renderMarkdownToHtml([':::warning[Use & "quotes" and \'single\']', 'Body', ':::', ''].join('\n'));
+    expect(html).toContain('<div class="callout-title">Use &#x26; "quotes" and \'single\'</div>');
+    expect(html).not.toContain('<div class="callout-title"><');
+  });
+
+  it('falls back to the default title for an empty label', async () => {
+    const html = await renderMarkdownToHtml([':::tip[]', 'Body', ':::', ''].join('\n'));
+    expect(html).toContain('<div class="callout-title">Tip</div>');
+    expect(html).not.toContain('<div class="callout-title"></div>');
+  });
+
+  it('keeps inner markdown formatting inside callouts', async () => {
+    const html = await renderMarkdownToHtml([':::note', 'Remember **bold** and _emphasis_.', ':::', ''].join('\n'));
+    expect(html).toBe(
+      '<div class="callout callout-note"><div class="callout-title">Note</div><p>Remember <strong>bold</strong> and <em>emphasis</em>.</p></div>',
+    );
+  });
+
+  it('renders list content inside callouts through normal markdown processing', async () => {
+    const html = await renderMarkdownToHtml([':::warning', '- One', '- Two', ':::', ''].join('\n'));
+    expect(html).toBe(
+      '<div class="callout callout-warning"><div class="callout-title">Warning</div><ul>\n<li>One</li>\n<li>Two</li>\n</ul></div>',
+    );
+  });
+
+  it('keeps unsupported directives as normal markdown content', async () => {
+    const html = await renderMarkdownToHtml([':::custom', 'Unsupported type', ':::', ''].join('\n'));
+    expect(html).toBe('<p>:::custom</p>\n<p>Unsupported type</p>\n<p>:::</p>');
+    expect(html).not.toContain('callout');
+  });
+
   it('rewrites relative image paths from manifest.map', async () => {
     const md = '![Logo](./images/logo.png)\n';
     const html = await renderMarkdownToHtml(md, {

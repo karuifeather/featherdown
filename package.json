@@ -29,6 +29,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:exports": "npm run build && node ./test/exports.smoke.mjs",
+    "verify-release-version": "node ./scripts/verify-release-version.mjs",
     "prepublishOnly": "npm run lint && npm run typecheck && npm test && npm run test:exports"
   },
   "keywords": [
@@ -42,6 +43,17 @@
     "publishing"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/karuifeather/featherdown.git"
+  },
+  "bugs": {
+    "url": "https://github.com/karuifeather/featherdown/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "engines": {
     "node": ">=18"
   },

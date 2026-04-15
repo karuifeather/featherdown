@@ -26,7 +26,7 @@ type InternalOptions = RenderMarkdownOptions & {
 
 export function createMarkdownProcessorInternal(
   options?: InternalOptions,
-): Processor<MdastRoot, MdastRoot, HastRoot, undefined, undefined> {
+): Processor<MdastRoot, MdastRoot, HastRoot> {
   const processor = unified()
     .use(remarkParse)
     .use(remarkGfm)

@@ -176,6 +176,10 @@ Node-only entry (`featherdown/node`):
 | `npm run typecheck`    | Run TypeScript checks             |
 | `npm run test:exports` | Build and run export smoke checks |
 
+## Maintainers
+
+CI and publishing are described in [RELEASING.md](./RELEASING.md).
+
 ## License
 
 MIT. See [LICENSE](./LICENSE).

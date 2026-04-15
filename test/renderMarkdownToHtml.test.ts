@@ -55,4 +55,28 @@ describe('renderMarkdownToHtml', () => {
     expect(html).not.toContain('script');
     expect(html).not.toContain('evil');
   });
+
+  it('turns a valid chart fence into a chart-mount div in final HTML', async () => {
+    const md = ['```chart-line', '{"labels":["a"],"datasets":[]}', '```', ''].join('\n');
+    const html = await renderMarkdownToHtml(md);
+    expect(html).toBe(
+      '<div class="chart-mount" data-chart="line" data-chart-data="{&#x22;labels&#x22;:[&#x22;a&#x22;],&#x22;datasets&#x22;:[]}"></div>',
+    );
+  });
+
+  it('leaves invalid JSON chart fences as a normal highlighted code block', async () => {
+    const md = ['```chart-line', 'not json', '```', ''].join('\n');
+    const html = await renderMarkdownToHtml(md);
+    expect(html).toBe(
+      '<pre><code class="hljs language-chart-line">not json\n</code></pre>',
+    );
+  });
+
+  it('ignores unsupported chart language tags', async () => {
+    const md = ['```chart-unknown', '{}', '```', ''].join('\n');
+    const html = await renderMarkdownToHtml(md);
+    expect(html).toBe(
+      '<pre><code class="hljs language-chart-unknown">{}\n</code></pre>',
+    );
+  });
 });

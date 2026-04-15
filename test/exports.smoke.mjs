@@ -17,12 +17,12 @@ const rootCode = await readFile(new URL('../dist/index.js', import.meta.url), 'u
 const nodeCode = await readFile(new URL('../dist/node.js', import.meta.url), 'utf8');
 
 assert.equal(
-  rootCode.includes('rehype-mermaidjs') || rootCode.includes('playwright'),
+  rootCode.includes('rehype-mermaid') || rootCode.includes('playwright'),
   false,
   'Default entry must stay free of Mermaid/Playwright paths.',
 );
 assert.equal(
-  nodeCode.includes('rehype-mermaidjs'),
+  nodeCode.includes('rehype-mermaid'),
   true,
   'Node-only entry should include Mermaid integration.',
 );

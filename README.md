@@ -12,9 +12,10 @@ npm install featherdown
 
 Node.js 18+ is required.
 
-If you use Mermaid rendering from `featherdown/node`, install Playwright Chromium:
+If you use Mermaid rendering from `featherdown/node`, install Playwright and Chromium:
 
 ```bash
+npm install playwright
 npx playwright install chromium
 ```
 

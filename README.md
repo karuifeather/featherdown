@@ -1,18 +1,18 @@
-# blog-pipeline
+# featherdown
 
-`blog-pipeline` is a TypeScript package for converting Markdown into sanitized HTML for publishing workflows.
+`featherdown` is a TypeScript package for converting Markdown into sanitized HTML for publishing workflows.
 
 It provides a browser-safe default entry and a separate Node-only Mermaid subpath.
 
 ## Install
 
 ```bash
-npm install blog-pipeline
+npm install featherdown
 ```
 
 Node.js 18+ is required.
 
-If you use Mermaid rendering from `blog-pipeline/node`, install Playwright Chromium:
+If you use Mermaid rendering from `featherdown/node`, install Playwright Chromium:
 
 ```bash
 npx playwright install chromium
@@ -21,7 +21,7 @@ npx playwright install chromium
 ## Quick Start (Browser-Safe Default Entry)
 
 ```ts
-import { renderMarkdownToHtml } from 'blog-pipeline';
+import { renderMarkdownToHtml } from 'featherdown';
 
 const html = await renderMarkdownToHtml('## Hello **world**');
 ```
@@ -33,7 +33,7 @@ The default entry does not include Mermaid rendering.
 Use `renderMarkdown` to get both HTML and non-fatal warnings.
 
 ```ts
-import { renderMarkdown } from 'blog-pipeline';
+import { renderMarkdown } from 'featherdown';
 
 const { html, diagnostics } = await renderMarkdown(
   '```chart-line\nnot json\n```',
@@ -48,7 +48,7 @@ console.log(diagnostics);
 Use `createMarkdownProcessor` when you want direct control of processing calls.
 
 ```ts
-import { createMarkdownProcessor } from 'blog-pipeline';
+import { createMarkdownProcessor } from 'featherdown';
 
 const processor = createMarkdownProcessor();
 const file = await processor.process('# Hello');
@@ -64,7 +64,7 @@ import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkRehype from 'remark-rehype';
 import rehypeStringify from 'rehype-stringify';
-import { rehypeChartBlocks, rehypeCdnImages } from 'blog-pipeline';
+import { rehypeChartBlocks, rehypeCdnImages } from 'featherdown';
 
 const html = String(
   await unified()
@@ -80,7 +80,7 @@ const html = String(
 ## Image Rewriting Example
 
 ```ts
-import { renderMarkdownToHtml } from 'blog-pipeline';
+import { renderMarkdownToHtml } from 'featherdown';
 
 const html = await renderMarkdownToHtml('![Logo](./images/logo.png)', {
   kind: 'post',
@@ -120,7 +120,7 @@ This package does not bundle a chart runtime; it only emits mount markup.
 ## Node-Only Mermaid Subpath
 
 ```ts
-import { renderMarkdownToHtmlWithMermaid } from 'blog-pipeline/node';
+import { renderMarkdownToHtmlWithMermaid } from 'featherdown/node';
 
 const html = await renderMarkdownToHtmlWithMermaid(
   '```mermaid\ngraph TD; A-->B;\n```',
@@ -133,7 +133,7 @@ Use this entry in Node publishing environments where Playwright + Mermaid depend
 
 - KaTeX CSS is required for correct math styling.
 - Syntax highlighting output includes highlight.js classes; include matching styles in your app.
-- Mermaid rendering from `blog-pipeline/node` depends on Playwright Chromium availability.
+- Mermaid rendering from `featherdown/node` depends on Playwright Chromium availability.
 
 ## Security and Trust Guidance
 
@@ -143,7 +143,7 @@ Use this entry in Node publishing environments where Playwright + Mermaid depend
 
 ## Public API
 
-Default entry (`blog-pipeline`):
+Default entry (`featherdown`):
 
 - `renderMarkdownToHtml`
 - `renderMarkdown`
@@ -153,7 +153,7 @@ Default entry (`blog-pipeline`):
 - `parseMarkdownFile`
 - `libraryId`
 
-Node-only entry (`blog-pipeline/node`):
+Node-only entry (`featherdown/node`):
 
 - `renderMarkdownToHtmlWithMermaid`
 

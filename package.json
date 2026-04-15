@@ -1,5 +1,5 @@
 {
-  "name": "blog-pipeline",
+  "name": "featherdown",
   "version": "0.1.0",
   "description": "Markdown-to-HTML pipeline with sanitization, diagnostics, and optional Node Mermaid rendering.",
   "type": "module",

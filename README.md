@@ -92,6 +92,39 @@ console.log(diagnostics);
 
 Diagnostics are intended for developer feedback, not end-user rendering.
 
+### Render HTML with document metadata
+
+Use `renderMarkdownDocument` when publishing workflows need HTML plus table-of-contents data, excerpt text, and reading stats from the final browser-safe output.
+
+```ts
+import { renderMarkdownDocument } from "featherdown";
+
+const document = await renderMarkdownDocument(`
+# Post Title
+
+This first paragraph can be used as preview text.
+
+## Section A
+Body text here.
+`);
+
+console.log(document.html);
+console.log(document.toc);
+console.log(document.excerpt);
+console.log(document.wordCount, document.estimatedReadingMinutes);
+```
+
+Returned metadata:
+
+- `toc`: ordered heading list with `depth`, final `text`, and final `id`
+- `excerpt`: first meaningful plain-text content from rendered `p`, `blockquote`, or `li`, or `null`
+- `wordCount`: deterministic plain-text word count from rendered document text
+- `estimatedReadingMinutes`: whole-minute estimate from word count (minimum `1` when text exists, `0` when none)
+
+The metadata is derived from the same processed document structure that produces the final HTML, so TOC ids and text stay aligned with rendered output.
+
+Common uses include TOC sidebars, preview cards, and reading-time badges.
+
 ### Parse front matter
 
 ```ts
@@ -240,6 +273,7 @@ Default entry (`featherdown`):
 
 - `renderMarkdownToHtml`
 - `renderMarkdown`
+- `renderMarkdownDocument`
 - `createMarkdownProcessor`
 - `rehypeChartBlocks`
 - `rehypeCdnImages`

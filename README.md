@@ -1,8 +1,30 @@
 # featherdown
 
-`featherdown` is a TypeScript package for converting Markdown into sanitized HTML for publishing workflows.
+**featherdown** is an ESM-first Markdown publishing engine for **Node, browsers, and Deno**.
 
-It provides a browser-safe default entry and a separate Node-only Mermaid subpath.
+It turns Markdown into sanitized HTML with a production-friendly pipeline that includes:
+
+- GFM
+- math via KaTeX
+- syntax highlighting
+- heading anchors
+- chart placeholder blocks
+- optional manifest-based image rewriting
+- non-fatal render diagnostics
+- an optional **Node-only Mermaid** entry for static SVG rendering
+
+It is built for publishing workflows that want more than raw Markdown parsing, but less complexity than assembling and maintaining a full unified stack by hand.
+
+## Why featherdown?
+
+Use `featherdown` when you want:
+
+- a ready-to-use Markdown → HTML pipeline
+- a browser-safe default entry
+- explicit sanitization instead of “bring your own sanitizer”
+- publishing-oriented extras like chart placeholders and image rewriting
+- optional diagnostics for content issues that should not crash rendering
+- a separate Node-only Mermaid path instead of bundling Node-specific behavior into the default entry
 
 ## Install
 
@@ -10,7 +32,7 @@ It provides a browser-safe default entry and a separate Node-only Mermaid subpat
 npm install featherdown
 ```
 
-JSR (Deno):
+JSR / Deno:
 
 ```ts
 import { renderMarkdownToHtml } from "jsr:@karuifeather/featherdown";
@@ -25,7 +47,7 @@ npm install playwright
 npx playwright install chromium
 ```
 
-## Quick Start (Browser-Safe Default Entry)
+## Quick Start
 
 ```ts
 import { renderMarkdownToHtml } from "featherdown";
@@ -33,11 +55,29 @@ import { renderMarkdownToHtml } from "featherdown";
 const html = await renderMarkdownToHtml("## Hello **world**");
 ```
 
-The default entry does not include Mermaid rendering.
+The default entry is browser-safe and does **not** include Mermaid rendering.
 
-## HTML + Diagnostics
+## Common Use Cases
 
-Use `renderMarkdown` to get both HTML and non-fatal warnings.
+### Render Markdown to HTML
+
+```ts
+import { renderMarkdownToHtml } from "featherdown";
+
+const html = await renderMarkdownToHtml(`
+# Post Title
+
+Here is some math: $E = mc^2$
+
+| Name | Value |
+| ---- | ----- |
+| A    | 1     |
+`);
+```
+
+### Render HTML with warnings
+
+Use `renderMarkdown` when you want HTML plus non-fatal diagnostics.
 
 ````ts
 import { renderMarkdown } from "featherdown";
@@ -50,9 +90,77 @@ console.log(html);
 console.log(diagnostics);
 ````
 
-## Processor Factory Usage
+Diagnostics are intended for developer feedback, not end-user rendering.
 
-Use `createMarkdownProcessor` when you want direct control of processing calls.
+### Parse front matter
+
+```ts
+import { parseMarkdownFile } from "featherdown";
+
+const result = parseMarkdownFile(`---
+title: Hello
+tags:
+  - docs
+---
+
+# Hello world
+`);
+
+console.log(result.frontMatter);
+console.log(result.content);
+```
+
+## Publishing Features
+
+### Chart placeholder blocks
+
+Supported `chart-*` code fences with valid JSON are transformed into placeholder mount nodes.
+
+````md
+```chart-line
+{"labels":["a"],"datasets":[]}
+```
+````
+
+Rendered HTML shape:
+
+```html
+<div
+  class="chart-mount"
+  data-chart="line"
+  data-chart-data='{"labels":["a"],"datasets":[]}'
+></div>
+```
+
+`featherdown` does not bundle a chart runtime. It only emits mount markup that your app can hydrate later.
+
+### Image rewriting
+
+Use manifest-based rewriting for relative Markdown images in publishing workflows.
+
+```ts
+import { renderMarkdownToHtml } from "featherdown";
+
+const html = await renderMarkdownToHtml("![Logo](./images/logo.png)", {
+  kind: "post",
+  slug: "hello-world",
+  manifest: {
+    map: {
+      "post/hello-world/images/logo.png": {
+        url: "https://cdn.example.com/blog/hello-world/logo.hash.png",
+      },
+    },
+  },
+});
+```
+
+Relative image rewriting is optional and entirely caller-driven. No CDN logic or fetch behavior is bundled into the package.
+
+## Advanced Usage
+
+### Create the default processor directly
+
+Use `createMarkdownProcessor` when you want direct control over processing calls while keeping featherdown’s default browser-safe pipeline.
 
 ```ts
 import { createMarkdownProcessor } from "featherdown";
@@ -62,9 +170,9 @@ const file = await processor.process("# Hello");
 const html = String(file);
 ```
 
-## Direct Plugin Usage
+### Use the plugins directly
 
-The package exports focused plugins for custom unified pipelines.
+The package also exports focused plugins for custom unified pipelines.
 
 ```ts
 import { unified } from "unified";
@@ -84,47 +192,9 @@ const html = String(
 );
 ```
 
-## Image Rewriting Example
+## Node-only Mermaid Rendering
 
-```ts
-import { renderMarkdownToHtml } from "featherdown";
-
-const html = await renderMarkdownToHtml("![Logo](./images/logo.png)", {
-  kind: "post",
-  slug: "hello-world",
-  manifest: {
-    map: {
-      "post/hello-world/images/logo.png": {
-        url: "https://cdn.example.com/blog/hello-world/logo.hash.png",
-      },
-    },
-  },
-});
-```
-
-## Chart Placeholder Example
-
-Valid JSON in supported `chart-*` fences becomes a placeholder mount node:
-
-````md
-```chart-line
-{"labels":["a"],"datasets":[]}
-```
-````
-
-Rendered HTML shape:
-
-```html
-<div
-  class="chart-mount"
-  data-chart="line"
-  data-chart-data='{"labels":["a"],"datasets":[]}'
-></div>
-```
-
-This package does not bundle a chart runtime; it only emits mount markup.
-
-## Node-Only Mermaid Subpath
+For static Mermaid rendering, use the separate Node-only entry:
 
 ````ts
 import { renderMarkdownToHtmlWithMermaid } from "featherdown/node";
@@ -134,8 +204,9 @@ const html = await renderMarkdownToHtmlWithMermaid(
 );
 ````
 
-Use this entry in Node publishing environments where Playwright + Mermaid dependencies are acceptable.
-The `node` Mermaid subpath is npm-focused and is not part of the JSR export surface.
+Use this entry in Node publishing environments where Playwright + Chromium dependencies are acceptable.
+
+The Mermaid subpath is npm-focused and is **not** part of the JSR export surface.
 
 ## CSS / Asset Expectations
 
@@ -145,9 +216,23 @@ The `node` Mermaid subpath is npm-focused and is not part of the JSR export surf
 
 ## Security and Trust Guidance
 
-- Input is sanitized with `rehype-sanitize`; scripts are removed.
-- Treat Markdown as untrusted by default unless your ingestion workflow guarantees trusted content.
-- Review and test your final HTML integration, including any custom render-time plugins you add.
+- Input is sanitized with `rehype-sanitize`.
+- Script tags are stripped.
+- The default entry is designed to be browser-safe.
+- The Mermaid entry is better suited to trusted Node publishing workflows than arbitrary user-generated content.
+- Always review your final HTML integration, especially if you add custom plugins around the built-in pipeline.
+
+## Why not just wire unified yourself?
+
+You absolutely can.
+
+`featherdown` exists for teams that want:
+
+- a production-friendly default pipeline
+- deliberate plugin ordering
+- sanitization already considered
+- publishing-oriented features beyond plain Markdown parsing
+- a clean split between browser-safe rendering and Node-only Mermaid rendering
 
 ## Public API
 
@@ -178,7 +263,7 @@ Node-only entry (`featherdown/node`):
 
 ## Maintainers
 
-CI and publishing are described in [RELEASING.md](./RELEASING.md).
+CI and publishing are documented in [RELEASING.md](./RELEASING.md).
 
 ## License
 

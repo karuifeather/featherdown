@@ -167,6 +167,43 @@ Rendered HTML shape:
 
 `featherdown` does not bundle a chart runtime. It only emits mount markup that your app can hydrate later.
 
+### Admonitions / callouts
+
+The default browser-safe pipeline supports fenced admonitions using `:::type` with a closing `:::`.
+You can optionally provide a title with bracket syntax: `:::type[Title]`.
+
+Supported types:
+
+- `note`
+- `tip`
+- `warning`
+- `info`
+- `success`
+- `danger`
+- `error`
+- `caution`
+- `important`
+
+Example:
+
+````md
+:::note[Install CSS]
+Remember to install KaTeX CSS.
+:::
+````
+
+Emitted HTML contract:
+
+```html
+<div class="callout callout-note">
+  <div class="callout-title">Install CSS</div>
+  <p>Remember to install KaTeX CSS.</p>
+</div>
+```
+
+When no custom title is provided, a default title is emitted from the callout type (for example `warning` -> `Warning`).
+Callout body content continues through the normal Markdown pipeline, and styling is left to the consuming application.
+
 ### Image rewriting
 
 Use manifest-based rewriting for relative Markdown images in publishing workflows.

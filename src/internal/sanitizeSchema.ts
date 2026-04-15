@@ -20,6 +20,7 @@ const baseAttrs = defaultSchema.attributes ?? {};
 const baseStar = baseAttrs['*'] ?? [];
 const baseSpan = baseAttrs.span ?? [];
 const baseDiv = baseAttrs.div ?? [];
+const baseTags = defaultSchema.tagNames ?? [];
 
 export const markdownSanitizeSchema: Schema = {
   ...defaultSchema,
@@ -33,5 +34,96 @@ export const markdownSanitizeSchema: Schema = {
       ['dataChart', ...CHART_BLOCK_TYPES],
       'dataChartData',
     ],
+  },
+};
+
+const svgTags = [
+  'svg',
+  'g',
+  'path',
+  'marker',
+  'rect',
+  'circle',
+  'line',
+  'polygon',
+  'text',
+  'tspan',
+  'style',
+  'foreignObject',
+  'defs',
+  'symbol',
+] as const;
+
+const svgSharedAttributes = [
+  'style',
+  'transform',
+  'fill',
+  'stroke',
+  'strokeWidth',
+  'strokeDasharray',
+  'id',
+  'className',
+] as const;
+
+/**
+ * Mermaid-capable sanitizer schema for the Node-only rendering path.
+ * It extends the browser-safe schema with a narrow SVG allowlist used by
+ * inline Mermaid output.
+ */
+export const schemaWithSvg: Schema = {
+  ...markdownSanitizeSchema,
+  tagNames: [...baseTags, ...svgTags],
+  attributes: {
+    ...(markdownSanitizeSchema.attributes ?? {}),
+    div: [
+      ...baseDiv,
+      'style',
+      'xmlns',
+      ['className', 'chart-mount'],
+      ['dataChart', ...CHART_BLOCK_TYPES],
+      'dataChartData',
+    ],
+    svg: [
+      ...svgSharedAttributes,
+      'ariaRoleDescription',
+      'role',
+      'viewBox',
+      'width',
+      'xmlns',
+    ],
+    g: [
+      ...svgSharedAttributes,
+      'dataId',
+      'dataNode',
+    ],
+    path: [...svgSharedAttributes, 'd', 'markerEnd'],
+    marker: [
+      ...svgSharedAttributes,
+      'markerHeight',
+      'markerUnits',
+      'markerWidth',
+      'orient',
+      'refX',
+      'refY',
+      'viewBox',
+    ],
+    rect: [...svgSharedAttributes, 'height', 'rx', 'ry', 'width', 'x', 'y', 'name'],
+    circle: [...svgSharedAttributes, 'cx', 'cy', 'r'],
+    line: [...svgSharedAttributes, 'markerEnd', 'x1', 'x2', 'y1', 'y2'],
+    polygon: [...svgSharedAttributes, 'points'],
+    text: [
+      ...svgSharedAttributes,
+      'alignmentBaseline',
+      'dominantBaseline',
+      'dy',
+      'textAnchor',
+      'x',
+      'y',
+    ],
+    tspan: [...svgSharedAttributes, 'dy', 'x'],
+    foreignObject: ['height', 'width'],
+    symbol: ['clipRule', 'fillRule', 'height', 'id', 'width'],
+    defs: [],
+    style: [],
   },
 };

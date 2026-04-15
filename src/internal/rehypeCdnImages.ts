@@ -1,5 +1,6 @@
 import type { Element, Root } from 'hast';
 import { visit } from 'unist-util-visit';
+import type { DiagnosticEmitter } from './diagnostics.js';
 
 type ManifestEntry = { url: string };
 
@@ -10,6 +11,7 @@ type RehypeCdnImagesOptions = {
     map?: Record<string, ManifestEntry>;
     remote?: Record<string, ManifestEntry>;
   };
+  emitDiagnostic?: DiagnosticEmitter;
 };
 
 const REMOTE_SRC_PATTERN = /^(https?:\/\/|data:|blob:)/;
@@ -37,6 +39,7 @@ export default function rehypeCdnImages(options?: RehypeCdnImagesOptions) {
   const slug = options?.slug;
   const map = options?.manifest?.map;
   const remote = options?.manifest?.remote;
+  const emitDiagnostic = options?.emitDiagnostic;
 
   return (tree: Root): undefined => {
     visit(tree, 'element', (node) => {
@@ -60,7 +63,16 @@ export default function rehypeCdnImages(options?: RehypeCdnImagesOptions) {
       const cleanPath = src.replace(/^\.\/+/, '');
       const key = `${kind}/${slug}/${cleanPath}`;
       const nextSrc = map?.[key]?.url;
-      if (nextSrc) node.properties.src = nextSrc;
+      if (nextSrc) {
+        node.properties.src = nextSrc;
+      } else {
+        emitDiagnostic?.({
+          code: 'images.manifest_miss',
+          message: `No manifest entry found for "${key}".`,
+          severity: 'warning',
+          source: 'images',
+        });
+      }
     });
   };
 }

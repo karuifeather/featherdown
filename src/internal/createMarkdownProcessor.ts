@@ -14,6 +14,7 @@ import remarkRehype from 'remark-rehype';
 import { unified } from 'unified';
 import { remarkHeadingIds } from './headingIdsRemark.js';
 import { markdownSanitizeSchema } from './sanitizeSchema.js';
+import type { DiagnosticEmitter } from './diagnostics.js';
 
 type RenderManifest = {
   map?: Record<string, { url: string }>;
@@ -24,24 +25,32 @@ type CreateMarkdownProcessorOptions = {
   kind?: string;
   slug?: string;
   manifest?: RenderManifest;
+  emitDiagnostic?: DiagnosticEmitter;
 };
 
 export function createMarkdownProcessor(options?: CreateMarkdownProcessorOptions) {
-  return (
-    unified()
-      .use(remarkParse)
-      .use(remarkGfm)
-      .use(remarkMath)
-      .use(remarkHeadingIds)
-      .use(remarkRehype, { allowDangerousHtml: true })
-      .use(rehypeRaw)
-      .use(rehypeChartBlocks)
-      .use(rehypeKatex, { output: 'html' })
-      .use(rehypeSanitize, markdownSanitizeSchema)
-      .use(rehypeSlug)
-      .use(rehypeAutolinkHeadings, { behavior: 'wrap' })
-      .use(rehypeHighlight)
-      .use(rehypeCdnImages, options)
-      .use(rehypeStringify)
-  );
+  const processor = unified()
+    .use(remarkParse)
+    .use(remarkGfm)
+    .use(remarkMath)
+    .use(remarkHeadingIds)
+    .use(remarkRehype, { allowDangerousHtml: true })
+    .use(rehypeRaw);
+
+  if (options?.emitDiagnostic) {
+    processor.use(rehypeChartBlocks, { emitDiagnostic: options.emitDiagnostic });
+  } else {
+    processor.use(rehypeChartBlocks);
+  }
+
+  processor
+    .use(rehypeKatex, { output: 'html' })
+    .use(rehypeSanitize, markdownSanitizeSchema)
+    .use(rehypeSlug)
+    .use(rehypeAutolinkHeadings, { behavior: 'wrap' })
+    .use(rehypeHighlight)
+    .use(rehypeCdnImages, options)
+    .use(rehypeStringify);
+
+  return processor;
 }

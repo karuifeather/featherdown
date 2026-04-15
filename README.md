@@ -519,6 +519,29 @@ Node-only entry (`featherdown/node`):
 | `npm run typecheck`    | Run TypeScript checks             |
 | `npm run test:exports` | Build and run export smoke checks |
 
+## Site
+
+The repository includes a GitHub Pages-friendly site in `site/`.
+
+Run locally:
+
+```bash
+npm run site:install
+npm run site:dev
+```
+
+Build static assets:
+
+```bash
+npm run site:build
+```
+
+If deployed under a repository subpath, set `SITE_BASE_PATH` at build time:
+
+```bash
+SITE_BASE_PATH=/featherdown/ npm run site:build
+```
+
 ## Maintainers
 
 CI and publishing are documented in [RELEASING.md](./RELEASING.md).

@@ -7,7 +7,7 @@ const configDir = dirname(fileURLToPath(import.meta.url));
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'eslint.config.js'],
+    ignores: ['dist/**', 'eslint.config.js', 'test/exports.smoke.mjs'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked,

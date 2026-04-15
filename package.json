@@ -12,19 +12,23 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./node": {
       "types": "./dist/node.d.ts",
-      "import": "./dist/node.js"
-    }
+      "import": "./dist/node.js",
+      "default": "./dist/node.js"
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:exports": "npm run build && node ./test/exports.smoke.mjs"
   },
   "keywords": [
     "markdown",

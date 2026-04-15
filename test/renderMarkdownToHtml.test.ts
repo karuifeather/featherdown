@@ -25,17 +25,25 @@ describe('renderMarkdownToHtml', () => {
     expect(html).toMatch(/hljs-keyword/);
   });
 
-  it('adds slugs and autolink wrap to headings', async () => {
+  it('sets final h2 id and autolink href from the slugger for ordinary headings', async () => {
     const html = await renderMarkdownToHtml('## Section One\n');
-    expect(html).toContain('id="');
-    expect(html).toMatch(/<h2[^>]*><a[^>]*href="#[^"]+"/);
-    expect(html).toContain('Section One');
+    expect(html).toBe(
+      '<h2 id="section-one"><a href="#section-one">Section One</a></h2>',
+    );
   });
 
-  it('honors custom heading ids from {#id} syntax', async () => {
+  it('deduplicates slug ids when heading text repeats', async () => {
+    const html = await renderMarkdownToHtml('## Hello\n\n## Hello\n');
+    expect(html).toBe(
+      '<h2 id="hello"><a href="#hello">Hello</a></h2>\n<h2 id="hello-1"><a href="#hello-1">Hello</a></h2>',
+    );
+  });
+
+  it('prefixes {#id} in final HTML and keeps autolink href in sync', async () => {
     const html = await renderMarkdownToHtml('## My Title {#custom-slug}\n');
-    expect(html).toContain('user-content-custom-slug');
-    expect(html).toContain('My Title');
+    expect(html).toBe(
+      '<h2 id="user-content-custom-slug"><a href="#user-content-custom-slug">My Title</a></h2>',
+    );
     expect(html).not.toContain('{#custom-slug}');
   });
 

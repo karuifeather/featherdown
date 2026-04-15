@@ -1,5 +1,6 @@
 import type { Schema } from 'hast-util-sanitize';
 import { defaultSchema } from 'rehype-sanitize';
+import { CHART_BLOCK_TYPES } from './chartTypes.js';
 
 /**
  * Extends the GitHub-style default sanitizer for this pipeline:
@@ -10,12 +11,15 @@ import { defaultSchema } from 'rehype-sanitize';
  * - **`style` on `span` only** — KaTeX `output: 'html'` uses inline `style` on spans for
  *   layout; samples from KaTeX do not attach `style` to other tag names. Allowing
  *   `style` on every element would broaden XSS surface for author-controlled raw HTML.
+ * - **Chart placeholders** — `div.chart-mount` with `dataChart` / `dataChartData` (narrow
+ *   allowed chart type strings; data payload is the JSON string).
  *
  * Scripts remain stripped (`strip: ['script']`).
  */
 const baseAttrs = defaultSchema.attributes ?? {};
 const baseStar = baseAttrs['*'] ?? [];
 const baseSpan = baseAttrs.span ?? [];
+const baseDiv = baseAttrs.div ?? [];
 
 export const markdownSanitizeSchema: Schema = {
   ...defaultSchema,
@@ -23,5 +27,11 @@ export const markdownSanitizeSchema: Schema = {
     ...baseAttrs,
     '*': [...baseStar, 'className'],
     span: [...baseSpan, 'style'],
+    div: [
+      ...baseDiv,
+      ['className', 'chart-mount'],
+      ['dataChart', ...CHART_BLOCK_TYPES],
+      'dataChartData',
+    ],
   },
 };

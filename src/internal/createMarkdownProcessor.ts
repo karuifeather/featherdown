@@ -2,6 +2,7 @@ import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
+import rehypeChartBlocks from './rehypeChartBlocks.js';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeSlug from 'rehype-slug';
 import rehypeStringify from 'rehype-stringify';
@@ -22,6 +23,7 @@ export function createMarkdownProcessor() {
       .use(remarkHeadingIds)
       .use(remarkRehype, { allowDangerousHtml: true })
       .use(rehypeRaw)
+      .use(rehypeChartBlocks)
       .use(rehypeKatex, { output: 'html' })
       .use(rehypeSanitize, markdownSanitizeSchema)
       .use(rehypeSlug)

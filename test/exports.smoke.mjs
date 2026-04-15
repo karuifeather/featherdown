@@ -29,7 +29,7 @@ assert.equal(
 
 assert.equal(
   root.libraryId(),
-  'blog-pipeline',
+  'featherdown',
   'Public package entry should resolve and execute correctly.',
 );
 

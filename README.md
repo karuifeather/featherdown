@@ -1,6 +1,8 @@
 # blog-pipeline
 
-TypeScript library for **Markdown-to-HTML publishing**: turning author Markdown into sanitized HTML suitable for static sites, feeds, and similar workflows.
+`blog-pipeline` is a TypeScript package for converting Markdown into sanitized HTML for publishing workflows.
+
+It provides a browser-safe default entry and a separate Node-only Mermaid subpath.
 
 ## Install
 
@@ -8,60 +10,164 @@ TypeScript library for **Markdown-to-HTML publishing**: turning author Markdown 
 npm install blog-pipeline
 ```
 
-Requires **Node.js 18 or later**.
+Node.js 18+ is required.
 
-For Mermaid rendering in Node, install Playwright Chromium once:
+If you use Mermaid rendering from `blog-pipeline/node`, install Playwright Chromium:
 
 ```bash
 npx playwright install chromium
 ```
 
-## API
+## Quick Start (Browser-Safe Default Entry)
 
-- **`renderMarkdownToHtml(markdown: string, options?: { kind?: string; slug?: string; manifest?: { map?: Record<string, { url: string }>; remote?: Record<string, { url: string }> } }): Promise<string>`** — Runs the default browser-safe pipeline (GitHub Flavored Markdown, math via KaTeX with HTML output, fenced code highlighting, chart JSON placeholders, heading slugs and autolinks, raw HTML passed through `rehype-raw` then **`rehype-sanitize`**). Returns a complete HTML fragment string (not a full document).
+```ts
+import { renderMarkdownToHtml } from 'blog-pipeline';
 
-- **`renderMarkdown(markdown: string, options?: { kind?: string; slug?: string; manifest?: { map?: Record<string, { url: string }>; remote?: Record<string, { url: string }> } }): Promise<{ html: string; diagnostics: RenderDiagnostic[] }>`** — Same renderer as `renderMarkdownToHtml`, but also returns non-fatal **warning diagnostics** intended for developer feedback (not end-user rendering).
+const html = await renderMarkdownToHtml('## Hello **world**');
+```
 
-- **`createMarkdownProcessor(options?: RenderMarkdownOptions): Processor`** — Creates the underlying browser-safe unified processor used by the render helpers. Useful if you want to integrate the pipeline into an existing unified setup.
+The default entry does not include Mermaid rendering.
 
-- **`renderMarkdownToHtmlWithMermaid(markdown: string, options?: RenderMarkdownOptions): Promise<string>`** — Node-only Mermaid path, exported from the package subpath `blog-pipeline/node`. This keeps Mermaid/Playwright coupling out of the default browser-safe entry.
+## HTML + Diagnostics
 
-- **`parseMarkdownFile(raw: string): { frontMatter: Record<string, unknown>; content: string }`** — Parses optional YAML between leading `---` fences. If there is no valid block, returns `{ frontMatter: {}, content: raw }`. Invalid YAML throws an error with a clear message.
+Use `renderMarkdown` to get both HTML and non-fatal warnings.
 
-- **`libraryId(): string`** — Stable package identifier for diagnostics and tests.
+```ts
+import { renderMarkdown } from 'blog-pipeline';
 
-Typical flow: `parseMarkdownFile` for metadata, then `renderMarkdownToHtml` on `content`.
+const { html, diagnostics } = await renderMarkdown(
+  '```chart-line\nnot json\n```',
+);
 
-## Rendering behavior
+console.log(html);
+console.log(diagnostics);
+```
 
-`rehype-sanitize` uses the GitHub-style default schema, extended here with **`className` on all allowed elements** (needed for KaTeX, highlight.js, and classed raw HTML) and **`style` on `span` only** (KaTeX’s HTML output uses inline styles on spans). Scripts are stripped.
+## Processor Factory Usage
 
-**Chart placeholders:** a fenced block with language `chart-line`, `chart-bar`, `chart-radar`, `chart-doughnut`, `chart-pie`, `chart-polarArea`, `chart-bubble`, or `chart-scatter` and a JSON body is replaced by `<div class="chart-mount" data-chart="…" data-chart-data="…">` when the JSON parses. Invalid JSON leaves a normal code block. This package does not ship Chart.js or other chart runtimes—only the mount markup.
+Use `createMarkdownProcessor` when you want direct control of processing calls.
 
-**Image rewriting (optional):** pass `kind`, `slug`, and a `manifest` to rewrite relative image paths and selected remote URLs from caller-provided manifest data. The renderer does not fetch anything and does not bundle CDN logic.
+```ts
+import { createMarkdownProcessor } from 'blog-pipeline';
 
-**Diagnostics (warnings):** currently emitted for invalid JSON in supported `chart-…` fences and for relative image manifest misses when `kind` and `slug` are provided.
+const processor = createMarkdownProcessor();
+const file = await processor.process('# Hello');
+const html = String(file);
+```
 
-**Advanced use:** the package also exports `rehypeChartBlocks` and `rehypeCdnImages` so you can reuse those behaviors in custom pipelines without using the full renderer.
+## Direct Plugin Usage
 
-**Node-only Mermaid entry:** import from `blog-pipeline/node` when you need inline SVG Mermaid rendering. It uses Node tooling and is better suited to trusted publishing workflows than arbitrary untrusted content.
+The package exports focused plugins for custom unified pipelines.
 
-Heading ids: **`rehype-slug` runs after sanitization**, so ordinary headings get slug ids such as `section-one` with matching `href="#section-one"`. A custom ` {#my-id}` is applied earlier and is subject to the sanitizer’s id handling, so the final `id` and `href` use the `user-content-` prefix (for example `user-content-my-id`).
+```ts
+import { unified } from 'unified';
+import remarkParse from 'remark-parse';
+import remarkRehype from 'remark-rehype';
+import rehypeStringify from 'rehype-stringify';
+import { rehypeChartBlocks, rehypeCdnImages } from 'blog-pipeline';
 
-Math uses KaTeX **`output: 'html'`** so MathML is not emitted. Load KaTeX CSS in your app for correct typography.
+const html = String(
+  await unified()
+    .use(remarkParse)
+    .use(remarkRehype)
+    .use(rehypeChartBlocks)
+    .use(rehypeCdnImages, { kind: 'post', slug: 'hello-world' })
+    .use(rehypeStringify)
+    .process(markdown),
+);
+```
 
-Mermaid and pluggable processors are **not** included.
+## Image Rewriting Example
+
+```ts
+import { renderMarkdownToHtml } from 'blog-pipeline';
+
+const html = await renderMarkdownToHtml('![Logo](./images/logo.png)', {
+  kind: 'post',
+  slug: 'hello-world',
+  manifest: {
+    map: {
+      'post/hello-world/images/logo.png': {
+        url: 'https://cdn.example.com/blog/hello-world/logo.hash.png',
+      },
+    },
+  },
+});
+```
+
+## Chart Placeholder Example
+
+Valid JSON in supported `chart-*` fences becomes a placeholder mount node:
+
+````md
+```chart-line
+{"labels":["a"],"datasets":[]}
+```
+````
+
+Rendered HTML shape:
+
+```html
+<div
+  class="chart-mount"
+  data-chart="line"
+  data-chart-data="{&quot;labels&quot;:[&quot;a&quot;],&quot;datasets&quot;:[]}"
+></div>
+```
+
+This package does not bundle a chart runtime; it only emits mount markup.
+
+## Node-Only Mermaid Subpath
+
+```ts
+import { renderMarkdownToHtmlWithMermaid } from 'blog-pipeline/node';
+
+const html = await renderMarkdownToHtmlWithMermaid(
+  '```mermaid\ngraph TD; A-->B;\n```',
+);
+```
+
+Use this entry in Node publishing environments where Playwright + Mermaid dependencies are acceptable.
+
+## CSS / Asset Expectations
+
+- KaTeX CSS is required for correct math styling.
+- Syntax highlighting output includes highlight.js classes; include matching styles in your app.
+- Mermaid rendering from `blog-pipeline/node` depends on Playwright Chromium availability.
+
+## Security and Trust Guidance
+
+- Input is sanitized with `rehype-sanitize`; scripts are removed.
+- Treat Markdown as untrusted by default unless your ingestion workflow guarantees trusted content.
+- Review and test your final HTML integration, including any custom render-time plugins you add.
+
+## Public API
+
+Default entry (`blog-pipeline`):
+
+- `renderMarkdownToHtml`
+- `renderMarkdown`
+- `createMarkdownProcessor`
+- `rehypeChartBlocks`
+- `rehypeCdnImages`
+- `parseMarkdownFile`
+- `libraryId`
+
+Node-only entry (`blog-pipeline/node`):
+
+- `renderMarkdownToHtmlWithMermaid`
 
 ## Scripts
 
-| Script                | Description                    |
-|-----------------------|--------------------------------|
-| `npm run build`       | Produce ESM output under `dist/` |
-| `npm test`            | Run the test suite once          |
-| `npm run test:watch`  | Run tests in watch mode          |
-| `npm run lint`        | ESLint                           |
-| `npm run typecheck`   | TypeScript, no emit              |
+| Script | Description |
+|---|---|
+| `npm run build` | Build ESM artifacts in `dist/` |
+| `npm test` | Run Vitest once |
+| `npm run test:watch` | Run Vitest in watch mode |
+| `npm run lint` | Run ESLint |
+| `npm run typecheck` | Run TypeScript checks |
+| `npm run test:exports` | Build and run export smoke checks |
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT. See [LICENSE](./LICENSE).

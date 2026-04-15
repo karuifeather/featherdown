@@ -1,0 +1,27 @@
+{
+  "name": "@karuifeather/featherdown",
+  "version": "0.1.1",
+  "unstable": ["sloppy-imports"],
+  "exports": {
+    ".": "./src/index.ts",
+    "./parseMarkdownFile": "./src/parseMarkdownFile.ts",
+    "./createMarkdownProcessor": "./src/createMarkdownProcessor.ts",
+    "./rehypeChartBlocks": "./src/rehypeChartBlocks.ts",
+    "./rehypeCdnImages": "./src/rehypeCdnImages.ts",
+    "./renderMarkdown": "./src/renderMarkdown.ts",
+    "./renderMarkdownToHtml": "./src/renderMarkdownToHtml.ts",
+    "./libraryId": "./src/libraryId.ts"
+  },
+  "publish": {
+    "exclude": [
+      ".git/",
+      ".github/",
+      "coverage/",
+      "dist/",
+      "node_modules/",
+      "test/",
+      ".gitignore",
+      "package-lock.json"
+    ]
+  }
+}

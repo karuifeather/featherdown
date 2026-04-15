@@ -10,6 +10,12 @@ It provides a browser-safe default entry and a separate Node-only Mermaid subpat
 npm install featherdown
 ```
 
+JSR (Deno):
+
+```ts
+import { renderMarkdownToHtml } from "jsr:@karuifeather/featherdown";
+```
+
 Node.js 18+ is required.
 
 If you use Mermaid rendering from `featherdown/node`, install Playwright and Chromium:
@@ -22,9 +28,9 @@ npx playwright install chromium
 ## Quick Start (Browser-Safe Default Entry)
 
 ```ts
-import { renderMarkdownToHtml } from 'featherdown';
+import { renderMarkdownToHtml } from "featherdown";
 
-const html = await renderMarkdownToHtml('## Hello **world**');
+const html = await renderMarkdownToHtml("## Hello **world**");
 ```
 
 The default entry does not include Mermaid rendering.
@@ -33,26 +39,26 @@ The default entry does not include Mermaid rendering.
 
 Use `renderMarkdown` to get both HTML and non-fatal warnings.
 
-```ts
-import { renderMarkdown } from 'featherdown';
+````ts
+import { renderMarkdown } from "featherdown";
 
 const { html, diagnostics } = await renderMarkdown(
-  '```chart-line\nnot json\n```',
+  "```chart-line\nnot json\n```",
 );
 
 console.log(html);
 console.log(diagnostics);
-```
+````
 
 ## Processor Factory Usage
 
 Use `createMarkdownProcessor` when you want direct control of processing calls.
 
 ```ts
-import { createMarkdownProcessor } from 'featherdown';
+import { createMarkdownProcessor } from "featherdown";
 
 const processor = createMarkdownProcessor();
-const file = await processor.process('# Hello');
+const file = await processor.process("# Hello");
 const html = String(file);
 ```
 
@@ -61,18 +67,18 @@ const html = String(file);
 The package exports focused plugins for custom unified pipelines.
 
 ```ts
-import { unified } from 'unified';
-import remarkParse from 'remark-parse';
-import remarkRehype from 'remark-rehype';
-import rehypeStringify from 'rehype-stringify';
-import { rehypeChartBlocks, rehypeCdnImages } from 'featherdown';
+import { unified } from "unified";
+import remarkParse from "remark-parse";
+import remarkRehype from "remark-rehype";
+import rehypeStringify from "rehype-stringify";
+import { rehypeChartBlocks, rehypeCdnImages } from "featherdown";
 
 const html = String(
   await unified()
     .use(remarkParse)
     .use(remarkRehype)
     .use(rehypeChartBlocks)
-    .use(rehypeCdnImages, { kind: 'post', slug: 'hello-world' })
+    .use(rehypeCdnImages, { kind: "post", slug: "hello-world" })
     .use(rehypeStringify)
     .process(markdown),
 );
@@ -81,15 +87,15 @@ const html = String(
 ## Image Rewriting Example
 
 ```ts
-import { renderMarkdownToHtml } from 'featherdown';
+import { renderMarkdownToHtml } from "featherdown";
 
-const html = await renderMarkdownToHtml('![Logo](./images/logo.png)', {
-  kind: 'post',
-  slug: 'hello-world',
+const html = await renderMarkdownToHtml("![Logo](./images/logo.png)", {
+  kind: "post",
+  slug: "hello-world",
   manifest: {
     map: {
-      'post/hello-world/images/logo.png': {
-        url: 'https://cdn.example.com/blog/hello-world/logo.hash.png',
+      "post/hello-world/images/logo.png": {
+        url: "https://cdn.example.com/blog/hello-world/logo.hash.png",
       },
     },
   },
@@ -112,7 +118,7 @@ Rendered HTML shape:
 <div
   class="chart-mount"
   data-chart="line"
-  data-chart-data="{&quot;labels&quot;:[&quot;a&quot;],&quot;datasets&quot;:[]}"
+  data-chart-data='{"labels":["a"],"datasets":[]}'
 ></div>
 ```
 
@@ -120,15 +126,16 @@ This package does not bundle a chart runtime; it only emits mount markup.
 
 ## Node-Only Mermaid Subpath
 
-```ts
-import { renderMarkdownToHtmlWithMermaid } from 'featherdown/node';
+````ts
+import { renderMarkdownToHtmlWithMermaid } from "featherdown/node";
 
 const html = await renderMarkdownToHtmlWithMermaid(
-  '```mermaid\ngraph TD; A-->B;\n```',
+  "```mermaid\ngraph TD; A-->B;\n```",
 );
-```
+````
 
 Use this entry in Node publishing environments where Playwright + Mermaid dependencies are acceptable.
+The `node` Mermaid subpath is npm-focused and is not part of the JSR export surface.
 
 ## CSS / Asset Expectations
 
@@ -160,13 +167,13 @@ Node-only entry (`featherdown/node`):
 
 ## Scripts
 
-| Script | Description |
-|---|---|
-| `npm run build` | Build ESM artifacts in `dist/` |
-| `npm test` | Run Vitest once |
-| `npm run test:watch` | Run Vitest in watch mode |
-| `npm run lint` | Run ESLint |
-| `npm run typecheck` | Run TypeScript checks |
+| Script                 | Description                       |
+| ---------------------- | --------------------------------- |
+| `npm run build`        | Build ESM artifacts in `dist/`    |
+| `npm test`             | Run Vitest once                   |
+| `npm run test:watch`   | Run Vitest in watch mode          |
+| `npm run lint`         | Run ESLint                        |
+| `npm run typecheck`    | Run TypeScript checks             |
 | `npm run test:exports` | Build and run export smoke checks |
 
 ## License

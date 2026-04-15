@@ -11,6 +11,9 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import remarkRehype from 'remark-rehype';
+import type { Root as HastRoot } from 'hast';
+import type { Root as MdastRoot } from 'mdast';
+import type { Processor } from 'unified';
 import { unified } from 'unified';
 import type { RenderMarkdownOptions } from '../types.js';
 import { remarkHeadingIds } from './headingIdsRemark.js';
@@ -23,7 +26,7 @@ type InternalOptions = RenderMarkdownOptions & {
 
 export function createMarkdownProcessorInternal(
   options?: InternalOptions,
-) {
+): Processor<MdastRoot, MdastRoot, HastRoot, undefined, undefined> {
   const processor = unified()
     .use(remarkParse)
     .use(remarkGfm)

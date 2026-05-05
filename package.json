@@ -48,7 +48,7 @@
     "prepublishOnly": "npm run lint && npm run typecheck && npm test && npm run test:exports",
     "site:install": "npm install --prefix site",
     "site:dev": "npm run dev --prefix site",
-    "site:build": "npm run build --prefix site",
+    "site:build": "npm run build && npm run build --prefix site",
     "site:preview": "npm run preview --prefix site"
   },
   "keywords": [

@@ -1,30 +1,10 @@
 # featherdown
 
-**featherdown** is an ESM-first Markdown publishing engine for **Node, browsers, and Deno**.
+**featherdown** is a publishing-focused Markdown engine for apps, blogs, docs, and product surfaces that want **sanitized HTML**, **publishing metadata**, **diagnostics**, **code and math support**, and **asset hints**—without hand-wiring a full [unified](https://github.com/unifiedjs/unified) pipeline.
 
-It turns Markdown into sanitized HTML with a production-friendly pipeline that includes:
+It is **not** a static site generator and does not ship client runtimes for charts, copy-to-clipboard behavior, or Mermaid in the browser. It produces HTML contracts and metadata your app can integrate.
 
-- GFM
-- math via KaTeX
-- syntax highlighting
-- heading anchors
-- chart placeholder blocks
-- optional manifest-based image rewriting
-- non-fatal render diagnostics
-- an optional **Node-only Mermaid** entry for static SVG rendering
-
-It is built for publishing workflows that want more than raw Markdown parsing, but less complexity than assembling and maintaining a full unified stack by hand.
-
-## Why featherdown?
-
-Use `featherdown` when you want:
-
-- a ready-to-use Markdown → HTML pipeline
-- a browser-safe default entry
-- explicit sanitization instead of “bring your own sanitizer”
-- publishing-oriented extras like chart placeholders and image rewriting
-- optional diagnostics for content issues that should not crash rendering
-- a separate Node-only Mermaid path instead of bundling Node-specific behavior into the default entry
+The default npm entry is **browser-safe**. Optional **Node-only** Mermaid (inline SVG) lives behind `featherdown/node`.
 
 ## Install
 
@@ -32,511 +12,440 @@ Use `featherdown` when you want:
 npm install featherdown
 ```
 
-JSR / Deno:
+Node.js **18+** is required.
+
+### JSR / Deno
+
+You can import the library from JSR (see [@karuifeather/featherdown](https://jsr.io/@karuifeather/featherdown)). **npm** publishes **CSS subpath exports** (`featherdown/styles.css`, `featherdown/styles/base.css`, and the other `featherdown/styles/*` entries in `package.json`). **Deno/JSR** (`deno.json` exports) does **not** mirror those CSS paths today—**CSS parity for JSR is deferred**; treat stylesheet wiring as environment-specific. **CSS packaging and `@import` resolution for JSR/Deno consumers are not treated as equivalent to npm bundler workflows.** Prefer npm (or a bundler) when you want the documented CSS entry points without extra setup.
+
+## Quick start
 
 ```ts
-import { renderMarkdownToHtml } from "jsr:@karuifeather/featherdown";
-```
+import { Featherdown } from "featherdown";
+import "featherdown/styles.css";
 
-Node.js 18+ is required.
+const featherdown = new Featherdown();
 
-If you use Mermaid rendering from `featherdown/node`, install Playwright and Chromium:
+const result = await featherdown.parse("# Hello");
 
-```bash
-npm install playwright
-npx playwright install chromium
-```
-
-## Quick Start
-
-```ts
-import { renderMarkdownToHtml } from "featherdown";
-
-const html = await renderMarkdownToHtml("## Hello **world**");
+console.log(result.html);
 ```
 
 The default entry is browser-safe and does **not** include Mermaid rendering.
 
-## Which API should I use?
+## Rendering Markdown
 
-| If you need... | Use... |
-| --- | --- |
-| Just sanitized HTML output | `renderMarkdownToHtml` |
-| HTML plus non-fatal warnings | `renderMarkdown` |
-| HTML plus publishing metadata (`toc`, `headings`, excerpt, reading stats) | `renderMarkdownDocument` |
-| Direct unified processor access with featherdown defaults | `createMarkdownProcessor` |
-| A custom unified pipeline with focused helpers | `rehypeChartBlocks`, `rehypeCdnImages` |
-| Mermaid-to-inline-SVG rendering in Node publishing flows | `renderMarkdownToHtmlWithMermaid` from `featherdown/node` |
-
-Rule of thumb:
-
-- Start with `renderMarkdownToHtml`.
-- Move to `renderMarkdown` when content warnings matter.
-- Move to `renderMarkdownDocument` when you need TOC/sidebar/preview metadata.
-- Use `createMarkdownProcessor` only when you need lower-level unified control.
-
-## Common Use Cases
-
-### Render Markdown to HTML
+Use the **`Featherdown`** class as the primary API. Constructor options set defaults; each call to **`parse(markdown, parseOptions?)`** can override them (with a shallow merge and one-level merge for nested groups like `code` and `publishing`).
 
 ```ts
-import { renderMarkdownToHtml } from "featherdown";
+const featherdown = new Featherdown({
+  frontmatter: "auto",
+  math: true,
+  code: true,
+  diagnostics: "warn",
+});
 
-const html = await renderMarkdownToHtml(`
-# Post Title
-
-Here is some math: $E = mc^2$
-
-| Name | Value |
-| ---- | ----- |
-| A    | 1     |
-`);
+const result = await featherdown.parse(markdown);
 ```
 
-### Render HTML with warnings
-
-Use `renderMarkdown` when you want HTML plus non-fatal diagnostics.
-
-````ts
-import { renderMarkdown } from "featherdown";
-
-const { html, diagnostics } = await renderMarkdown(
-  "```chart-line\nnot json\n```",
-);
-
-console.log(html);
-console.log(diagnostics);
-````
-
-Diagnostics are intended for developer feedback, not end-user rendering.
-
-### Render a docs/blog page bundle
-
-Use `renderMarkdownDocument` to produce HTML and page metadata in one pass.
+### Image manifest example
 
 ```ts
-import { renderMarkdownDocument } from "featherdown";
-
-const page = await renderMarkdownDocument(markdown);
-
-const html = page.html;
-const sidebarItems = page.headings;
-const legacyToc = page.toc;
-const previewText = page.excerpt;
-const readingMinutes = page.estimatedReadingMinutes;
-```
-
-### Render HTML with document metadata
-
-Use `renderMarkdownDocument` when publishing workflows need HTML plus heading metadata, excerpt text, and reading stats from the final browser-safe output.
-
-```ts
-import { renderMarkdownDocument } from "featherdown";
-
-const document = await renderMarkdownDocument(`
-# Post Title
-
-This first paragraph can be used as preview text.
-
-## Section A
-Body text here.
-`);
-
-console.log(document.html);
-console.log(document.toc);
-console.log(document.headings);
-console.log(document.excerpt);
-console.log(document.wordCount, document.estimatedReadingMinutes);
-```
-
-Returned metadata:
-
-- `toc`: ordered heading list with `depth`, final `text`, and final `id`
-- `headings`: richer ordered heading metadata with `index`, `depth`, final `text`, final `id`, and `hasCustomId`
-- `excerpt`: first meaningful plain-text content from rendered `p`, `blockquote`, or `li`, or `null`
-- `wordCount`: deterministic plain-text word count from rendered document text
-- `estimatedReadingMinutes`: whole-minute estimate from word count (minimum `1` when text exists, `0` when none)
-
-`toc` stays intentionally compact for backwards-compatible navigation use, while `headings` is better for richer sidebars, heading-aware tooling, and workflows that need to detect explicit custom heading ids.
-
-The metadata is derived from the same processed document structure that produces the final HTML, so heading ids and text stay aligned with rendered output.
-
-Common uses include TOC sidebars, preview cards, and reading-time badges.
-
-### Parse front matter
-
-```ts
-import { parseMarkdownFile } from "featherdown";
-
-const result = parseMarkdownFile(`---
-title: Hello
-tags:
-  - docs
----
-
-# Hello world
-`);
-
-console.log(result.frontMatter);
-console.log(result.content);
-```
-
-### Publish styled code blocks (title + ranges + numbers + copy hooks)
-
-```ts
-import { renderMarkdownToHtml } from "featherdown";
-
-const markdown = `
-\`\`\`ts title="example.ts" {2} showLineNumbers showCopyButton
-const a = 1;
-const b = 2;
-\`\`\`
-`;
-
-const html = await renderMarkdownToHtml(markdown);
-```
-
-## Publishing Features
-
-### Chart placeholder blocks
-
-Supported `chart-*` code fences with valid JSON are transformed into placeholder mount nodes.
-
-````md
-```chart-line
-{"labels":["a"],"datasets":[]}
-```
-````
-
-Rendered HTML shape:
-
-```html
-<div
-  class="chart-mount"
-  data-chart="line"
-  data-chart-data='{"labels":["a"],"datasets":[]}'
-></div>
-```
-
-`featherdown` does not bundle a chart runtime. It only emits mount markup that your app can hydrate later.
-
-### Code block titles
-
-Fenced code blocks can include a title using `title="..."` metadata.
-
-````md
-```ts title="example.ts"
-const value = 1;
-```
-````
-
-Emitted HTML contract:
-
-```html
-<div class="code-block">
-  <div class="code-block-title">example.ts</div>
-  <pre><code class="hljs language-ts">...</code></pre>
-</div>
-```
-
-Title text is treated as plain text, and styling of `code-block` / `code-block-title` is left to the consuming application.
-
-### Code line highlights
-
-Fenced code blocks can mark highlighted lines using brace metadata:
-
-- `{2}`
-- `{2,4-5}`
-- `{1-3,6}`
-
-Highlighted lines receive `code-line-highlighted` in the rendered code, with minimal line wrappers:
-
-```html
-<pre><code class="hljs language-ts">
-  <span class="code-line">...</span>
-  <span class="code-line code-line-highlighted">...</span>
-</code></pre>
-```
-
-When a code block also has `title="..."`, title markup and line highlighting compose in the same block. Styling is left to the consuming application.
-
-### Code line numbers
-
-Fenced code blocks can opt into line numbers with `showLineNumbers`.
-
-````md
-```ts showLineNumbers
-const a = 1;
-const b = 2;
-```
-````
-
-Emitted HTML contract:
-
-```html
-<pre><code class="hljs language-ts code-line-numbered">
-  <span class="code-line">
-    <span class="code-line-number">1</span>
-    ...
-  </span>
-  <span class="code-line code-line-highlighted">
-    <span class="code-line-number">2</span>
-    ...
-  </span>
-</code></pre>
-```
-
-Line number styling is left to the consuming application. Line numbers compose with both `title="..."` and `{...}` line highlight metadata on the same fenced code block.
-
-### Code copy button markup
-
-Fenced code blocks can opt into copy-button markup with `showCopyButton` or `copyButton`.
-
-````md
-```ts title="example.ts" {2} showLineNumbers showCopyButton
-const a = 1;
-const b = 2;
-```
-````
-
-Emitted HTML contract:
-
-```html
-<div class="code-block code-block-copyable">
-  <div class="code-block-title">example.ts</div>
-  <button
-    type="button"
-    class="code-block-copy-button"
-    data-code-copy
-    data-code-copy-target="code-copy-target-1"
-  >
-    Copy
-  </button>
-  <pre><code data-code-copy-target="code-copy-target-1" class="hljs language-ts code-line-numbered">...</code></pre>
-</div>
-```
-
-Styling and clipboard behavior are left to the consuming application. This package emits only HTML contract hooks and does not include built-in clipboard runtime logic.
-
-### Admonitions / callouts
-
-The default browser-safe pipeline supports fenced admonitions using `:::type` with a closing `:::`.
-You can optionally provide a title with bracket syntax: `:::type[Title]`.
-
-Supported types:
-
-- `note`
-- `tip`
-- `warning`
-- `info`
-- `success`
-- `danger`
-- `error`
-- `caution`
-- `important`
-
-Example:
-
-````md
-:::note[Install CSS]
-Remember to install KaTeX CSS.
-:::
-````
-
-Emitted HTML contract:
-
-```html
-<div class="callout callout-note">
-  <div class="callout-title">Install CSS</div>
-  <p>Remember to install KaTeX CSS.</p>
-</div>
-```
-
-When no custom title is provided, a default title is emitted from the callout type (for example `warning` -> `Warning`).
-Callout body content continues through the normal Markdown pipeline, and styling is left to the consuming application.
-
-### Image rewriting
-
-Use manifest-based rewriting for relative Markdown images in publishing workflows.
-
-```ts
-import { renderMarkdownToHtml } from "featherdown";
-
-const html = await renderMarkdownToHtml("![Logo](./images/logo.png)", {
+const featherdown = new Featherdown({
   kind: "post",
   slug: "hello-world",
   manifest: {
     map: {
-      "post/hello-world/images/logo.png": {
-        url: "https://cdn.example.com/blog/hello-world/logo.hash.png",
-      },
+      "post/hello-world/images/logo.png": { url: "https://cdn.example.com/logo.png" },
     },
+  },
+});
+
+const result = await featherdown.parse(markdown);
+```
+
+## Result object
+
+`Featherdown.parse()` resolves to a **`FeatherdownResult`**. Commonly used fields:
+
+| Field | Meaning |
+| --- | --- |
+| **`html`** | Sanitized HTML string. |
+| **`body`** | Markdown body after front matter is stripped when front matter parsing is enabled and a valid block exists; otherwise the full input string. |
+| **`frontmatter`** | Parsed YAML object, or `{}` when absent or when front matter parsing is disabled. |
+| **`metadata`** | Normalized subset of common publishing fields (`title`, `description`, `tags`, etc.) derived from front matter. |
+| **`toc`** | Compact heading list for navigation (`depth`, `text`, `id`). |
+| **`headings`** | Richer heading metadata in document order (includes `hasCustomId`). |
+| **`excerpt`** | First meaningful plain-text excerpt from rendered flow content, or `null` when disabled or unavailable. |
+| **`wordCount`** / **`estimatedReadingMinutes`** | Derived from the rendered document text (subject to `publishing` options). |
+| **`stats`** | Mirrors `wordCount` and reading time for convenience. |
+| **`diagnostics`** | Non-fatal warnings (for example invalid chart JSON or manifest misses). |
+| **`assets`** | Hints such as **`assets.styles`** (selective package CSS paths) and **`assets.features`** (`math`, `code`, `charts`, `mermaid`). |
+
+`assets.styles` lists **selective** style paths (for example `featherdown/styles/base.css`), not the all-in `featherdown/styles.css` aggregate.
+
+## Styles
+
+Official styles target the **`featherdown-content`** wrapper class and related HTML contracts.
+
+### All-in (recommended starting point)
+
+These entry points are intended for **npm / bundler** workflows where the toolchain resolves package paths and nested `@import`s.
+
+```ts
+import "featherdown/styles.css";
+```
+
+This aggregates base, KaTeX, code, and highlight layers. It is the simplest path when you want the full default look.
+
+### Selective imports
+
+For smaller CSS payloads, import only what you need:
+
+```ts
+import "featherdown/styles/base.css";
+import "featherdown/styles/katex.css"; // when math is enabled
+import "featherdown/styles/code.css"; // when code blocks / shell chrome are used
+import "featherdown/styles/highlight.css"; // only when syntax highlighting is enabled
+```
+
+- **`base.css`** — Prose/layout and structural contracts for rendered content.
+- **`katex.css`** — Bundler-oriented entry that pulls in KaTeX’s distribution CSS for math output.
+- **`code.css`** — Featherdown code-block shell / chrome (titles, line layout hooks, etc.).
+- **`highlight.css`** — Default highlight.js theme CSS; **include this only when syntax highlighting is enabled** (`code` with default highlighting, or equivalent).
+
+Do **not** assume raw `<link href="node_modules/.../featherdown/styles.css">` without a bundler will resolve nested `@import`s the same way a bundler does.
+
+### Custom themes
+
+You can start from Featherdown's baseline styles and override them:
+
+```ts
+import "featherdown/styles/base.css";
+import "./markdown-theme.css";
+import "./code-theme.css";
+```
+
+Or skip `base.css` and fully own the rendered Markdown styles in your app.
+
+When code highlighting is enabled, rendered code uses highlight.js-style `hljs` token classes, so custom code themes can target classes such as `.hljs-keyword`, `.hljs-string`, and `.hljs-comment`.
+
+### Asset hints
+
+```ts
+const result = await featherdown.parse(markdown);
+console.log(result.assets.styles);
+```
+
+Use this in SSR or static generators to decide which stylesheets to emit alongside HTML.
+
+## Options
+
+These options are wired end-to-end today:
+
+```ts
+const featherdown = new Featherdown({
+  frontmatter: "auto",
+  math: true,
+  code: true,
+  sanitize: true,
+  diagnostics: true,
+  charts: true,
+  headings: true,
+  publishing: true,
+});
+```
+
+Object forms for nested groups:
+
+```ts
+const featherdown = new Featherdown({
+  code: {
+    enabled: true,
+    highlighting: true,
+  },
+  publishing: {
+    excerpt: true,
+    wordCount: true,
+    readingTime: true,
   },
 });
 ```
 
-Relative image rewriting is optional and entirely caller-driven. No CDN logic or fetch behavior is bundled into the package.
-
-## Styling hooks
-
-featherdown emits stable classes/data hooks you can style in your own CSS:
-
-- callouts: `callout`, `callout-<type>`, `callout-title`
-- code wrappers/titles: `code-block`, `code-block-title`
-- highlighted lines: `code-line`, `code-line-highlighted`
-- numbered lines: `code-line-numbered`, `code-line-number`
-- copy hooks: `code-block-copyable`, `code-block-copy-button`, `data-code-copy`, `data-code-copy-target`
-- chart placeholders: `chart-mount`
-- markdown images: `markdown-inline-img`
-
-These are contract hooks, not a built-in theme system. You own the final visual design.
-
-## Common publishing patterns
-
-- **Basic post page**: `renderMarkdownToHtml` + app-level CSS.
-- **Editorial QA**: `renderMarkdown` and surface `diagnostics` in author tooling.
-- **Docs/blog navigation**: `renderMarkdownDocument` and drive sidebars from `headings`.
-- **CDN assets**: pass `kind`, `slug`, and `manifest.map`/`manifest.remote`.
-- **Static Mermaid output**: use `featherdown/node` in a trusted Node build step.
-
-## Advanced Usage
-
-### Create the default processor directly
-
-Use `createMarkdownProcessor` when you want direct control over processing calls while keeping featherdown’s default browser-safe pipeline.
+- **`math`** — Toggle KaTeX HTML output for `$…$` / `$$…$$`.
+- **`code`** — Toggle code pipeline features; **`highlighting`** controls whether highlight.js classes and **`highlight.css`** are relevant.
+- **`frontmatter`** — `false`, `true`, or `"auto"`; controls whether leading YAML front matter is parsed and stripped from `body`.
+- **`sanitize`** — When enabled, output passes through `rehype-sanitize` with the package schema.
+- **`diagnostics`** — Controls whether warnings appear on the result and whether strict mode fails the parse.
+  - **`false`** — `result.diagnostics` is always `[]` (issues may still be detected internally).
+  - **`true`** or **`"warn"`** — Non-fatal diagnostics are returned on `result.diagnostics`; the parse does not throw.
+  - **`"strict"`** — Same collection as warn; if any diagnostic exists after rendering, the parse throws **`FeatherdownDiagnosticsError`** with **`error.diagnostics`** and optional **`error.result`** (full `FeatherdownResult`, including `html`). Use `instanceof FeatherdownDiagnosticsError` in callers that need to branch.
 
 ```ts
-import { createMarkdownProcessor } from "featherdown";
+import { Featherdown, FeatherdownDiagnosticsError } from "featherdown";
 
-const processor = createMarkdownProcessor();
-const file = await processor.process("# Hello");
-const html = String(file);
+const featherdown = new Featherdown({
+  diagnostics: "warn",
+});
+
+const strict = new Featherdown({
+  diagnostics: "strict",
+});
+
+try {
+  await strict.parse(markdown);
+} catch (e) {
+  if (e instanceof FeatherdownDiagnosticsError) {
+    console.error(e.diagnostics);
+  }
+}
 ```
+- **`charts`** — When enabled, valid `chart-*` fences become mount placeholders; invalid JSON surfaces diagnostics when diagnostics are enabled.
+- **`headings`** — Controls **`result.headings`** and **`result.toc`** (metadata extracted after render). Heading markup in **`html`** is unchanged; this option gates the arrays on the result.
+  - **`false`** — **`result.headings`** and **`result.toc`** are both empty arrays.
+  - **`true`** — Default heading metadata: both arrays are populated when rendered headings have ids.
+  - **Object** — Shape matches **`FeatherdownHeadingOptions`**: optional **`toc`**. When **`toc`** is **`false`**, **`result.toc`** is empty while **`result.headings`** can still be filled. Optional **`slugs`** and **`anchors`** are part of the public type and merge like other nested options; they do not toggle the Markdown processor in this release.
+- **`publishing`** — Gates excerpt, word count, and reading-time fields on the result.
 
-### Use the plugins directly
+**`kind`**, **`slug`**, and **`manifest`** (local `map` and optional `remote`) drive manifest-based image URL rewriting—the same shape supported historically on render helpers.
 
-The package also exports focused plugins for custom unified pipelines.
+Avoid treating every nested field on `FeatherdownOptions` as a global behavioral switch unless documented below (for example line numbers and copy UI remain **per-fence** in Markdown).
+
+## Front matter
+
+Publishing-style front matter is **opt in**. The default constructor does **not** strip YAML; pass **`frontmatter: "auto"`** (or `true`) when you want leading `---` YAML parsed and removed from the body string.
 
 ```ts
-import { unified } from "unified";
-import remarkParse from "remark-parse";
-import remarkRehype from "remark-rehype";
-import rehypeStringify from "rehype-stringify";
-import { rehypeChartBlocks, rehypeCdnImages } from "featherdown";
+const featherdown = new Featherdown({
+  frontmatter: "auto",
+});
 
-const html = String(
-  await unified()
-    .use(remarkParse)
-    .use(remarkRehype)
-    .use(rehypeChartBlocks)
-    .use(rehypeCdnImages, { kind: "post", slug: "hello-world" })
-    .use(rehypeStringify)
-    .process(markdown),
-);
+const result = await featherdown.parse(`---
+title: Hello World
+tags:
+  - docs
+---
+
+# Hello`);
 ```
 
-## Node-only Mermaid Rendering
+Then:
 
-For static Mermaid rendering, use the separate Node-only entry:
+- `result.frontmatter.title`, `result.metadata.title`
+- `result.body` — Markdown after the front matter block
+- `result.html` — Rendered from `body` only
 
-````ts
-import { renderMarkdownToHtmlWithMermaid } from "featherdown/node";
+**Lenient behavior:** invalid or non-mapping YAML does not throw; the raw document is treated as body content with empty `frontmatter` / `metadata` where applicable.
 
-const html = await renderMarkdownToHtmlWithMermaid(
-  "```mermaid\ngraph TD; A-->B;\n```",
-);
-````
+**Strict legacy utility:** `parseMarkdownFile()` still throws on invalid YAML and returns **`frontMatter`** / **`content`**. Use it only when you need that contract; otherwise prefer `Featherdown` with `frontmatter: "auto"`.
 
-Use this entry in Node publishing/build environments where Playwright + Chromium dependencies are acceptable.
+## Code blocks
 
-Behavior contract for Mermaid blocks in this entry:
+- **Fenced code** renders as sanitized `<pre><code>` with highlight.js classes when highlighting is on.
+- **Titles:** ` ```ts title="example.ts" ` — emits `code-block` / `code-block-title` markup.
+- **Line highlights:** ` ```ts {2,4-5} ` — `code-line` / `code-line-highlighted` wrappers.
+- **Line numbers:** ` ```ts showLineNumbers ` — `code-line-numbered` and per-line number spans (per fence).
+- **Copy UI hooks:** `showCopyButton` / `copyButton` on the fence emit button markup and `data-*` attributes for your app to wire up. **The package does not ship clipboard JavaScript.**
 
-- valid Mermaid fences render to inline sanitized SVG
-- invalid Mermaid fences fall back to a normal rendered code block
-- one Mermaid failure does not stop the rest of the document from rendering
+Styling for these contracts comes from **`code.css`** and **`highlight.css`** (when highlighting is enabled).
 
-The Mermaid subpath is npm-focused and is **not** part of the JSR export surface.
+## Math
+
+Enable math on the instance or per parse:
+
+```ts
+const featherdown = new Featherdown({
+  math: true,
+});
+```
+
+Ensure KaTeX styles are loaded (all-in `featherdown/styles.css`, or `featherdown/styles/katex.css`). The public option name is **`math`**; KaTeX is used internally for HTML output.
+
+## Charts, callouts, and publishing features
+
+### Chart placeholders
+
+Valid `chart-*` fenced JSON becomes a **`chart-mount`** placeholder with `data-chart` and `data-chart-data`. The package does **not** bundle a chart runtime—your app hydrates or renders charts.
+
+### Callouts (admonitions)
+
+`:::note`, `:::warning`, `:::tip`, etc. (with optional `:::type[Title]`) render to **`callout`** / **`callout-<type>`** structures. Body markdown is processed normally.
+
+### Images
+
+Optional **`manifest`** + **`kind`** + **`slug`** rewrite relative `![alt](./path)` sources using deterministic keys. No CDN fetching is built in.
+
+### TOC, excerpt, counts
+
+`toc`, `headings`, `excerpt`, `wordCount`, and `estimatedReadingMinutes` come from the **same** render pass as `html`, gated by **`headings`** and **`publishing`** options.
+
+## Node usage
+
+Import **`Featherdown` from `featherdown/node`** for filesystem helpers and optional Mermaid.
+
+```ts
+import { Featherdown } from "featherdown/node";
+
+const featherdown = new Featherdown({
+  frontmatter: "auto",
+});
+
+const result = await featherdown.parseFile("./posts/hello.md");
+```
+
+- **`parseFile(path)`** reads UTF-8 and returns the same **`FeatherdownResult`** as **`parse(markdown)`** for the same file contents and options.
+
+## Mermaid (Node only)
+
+Inline SVG Mermaid is available **only** through the Node entry, with **`mermaid: { render: "svg" }`**. There is **no** placeholder-only mode documented today.
+
+```ts
+import { Featherdown } from "featherdown/node";
+
+const featherdown = new Featherdown({
+  mermaid: {
+    render: "svg",
+  },
+});
+
+const result = await featherdown.parse(markdown);
+```
+
+- Uses **`rehype-mermaid`** and may require the **optional Playwright / Chromium** peer setup (`playwright` + `npx playwright install chromium`). Failures can be **environment-sensitive** in CI.
+- Valid diagrams become inline **SVG** in `html`; **`result.assets.features.mermaid`** is **`true`** when this path is active.
+- The Node Mermaid pipeline uses a **final SVG-aware sanitize** step and does **not** match every rehype plugin order detail of the default browser pipeline—expect rare edge differences for exotic inputs.
+
+The default **`featherdown`** entry remains Mermaid-free for bundle safety.
+
+## Advanced and compatibility APIs
+
+### `featherdown/advanced`
+
+The advanced subpath is for **existing low-level unified integrations**. Most applications should use **`Featherdown`**. The subpath exists for **existing unified pipelines** and low-level compatibility:
+
+```ts
+import {
+  createMarkdownProcessor,
+  rehypeChartBlocks,
+  rehypeCdnImages,
+} from "featherdown/advanced";
+```
+
+The same symbols remain re-exported from the **root** package for backward compatibility; prefer **`Featherdown`** for normal Markdown rendering.
+
+### Legacy function exports
+
+Older helpers (`renderMarkdownToHtml`, `renderMarkdown`, `renderMarkdownDocument`, `parseMarkdownFile`, `createMarkdownProcessor`, …) remain exported and marked **`@deprecated`**. They take **`RenderMarkdownOptions`**, not the full **`FeatherdownOptions`** surface (for example **`math`**, **`code`**, **`charts`**, **`frontmatter`**, and **`diagnostics: "strict"`** are **`Featherdown`** features). Prefer **`new Featherdown().parse()`** for new code.
+
+## Migration from legacy helpers
+
+Legacy helpers remain available for compatibility, but new code should use **`Featherdown`**.
+
+For default rendering behavior (what the legacy helpers covered under **`RenderMarkdownOptions`**), the closest migration is:
+
+```ts
+// Before
+const html = await renderMarkdownToHtml(markdown);
+
+// After
+const { html } = await new Featherdown().parse(markdown);
+```
+
+> **Migration note:** The legacy helpers are kept for compatibility and use the older **`RenderMarkdownOptions`** surface. They are not a full alias for **`FeatherdownOptions`**. For feature gates such as **`math`**, **`code`**, **`charts`**, **`frontmatter`**, and **`diagnostics: "strict"`**, use the **`Featherdown`** class.
+
+| Legacy | Prefer |
+| --- | --- |
+| `renderMarkdownToHtml(md, opts)` | `(await new Featherdown().parse(md)).html` — legacy **`opts`** only apply the older options shape; pass **`FeatherdownOptions`** on **`Featherdown`** when you need feature gates |
+| `renderMarkdown(md, opts)` | `await new Featherdown().parse(md)` — use **`r.html`** and **`r.diagnostics`**; same **`RenderMarkdownOptions`** limitation as above |
+| `renderMarkdownDocument(md, opts)` | `await new Featherdown().parse(md)` for the default document pipeline when **`opts`** are legacy **`RenderMarkdownOptions`**. The **`Featherdown`** result adds **`body`**, **`frontmatter`**, **`assets`**, and related fields—configure **`Featherdown`** directly if you need **`FeatherdownOptions`** (not understood by the helper) |
+| `parseMarkdownFile(md)` | `new Featherdown({ frontmatter: "auto" }).parse(md)` returns **`frontmatter`**, **`metadata`**, **`body`**, and **`html`** in one result. Keep **`parseMarkdownFile`** only when you need its strict **`{ frontMatter, content }`** contract |
+| `renderMarkdownToHtmlWithMermaid(md, opts)` (Node) | `new Featherdown({ mermaid: { render: "svg" } }).parse(md)` then read **`html`** from **`featherdown/node`** — add **`kind`**, **`manifest`**, and other options in the same object as needed; **do not spread** an options object that might already define **`mermaid`** (merge carefully or use a dedicated instance). Legacy **`opts`** remain **`RenderMarkdownOptions`**-shaped |
+| `createMarkdownProcessor(opts)` | **`Featherdown`** for normal use; **`featherdown/advanced`** only for custom unified graphs |
+
+**Strict diagnostics:** **`diagnostics: "strict"`** exists only on **`Featherdown`**; legacy render helpers do not use it.
+
+## Styling reference (HTML contracts)
+
+Rendered output uses stable classes including:
+
+- **Article surface:** wrap content in **`featherdown-content`** (see shipped CSS).
+- **Callouts:** `callout`, `callout-<type>`, `callout-title`
+- **Code:** `code-block`, `code-block-title`, `code-line`, `code-line-highlighted`, `code-line-numbered`, `code-line-number`, `code-block-copyable`, `code-block-copy-button`
+- **Charts:** `chart-mount`
+- **Images:** `markdown-inline-img`
+
+## Security and trust
+
+- Input is sanitized (`rehype-sanitize`); scripts are stripped in the default pipeline.
+- Prefer the **default** entry for untrusted user content.
+- The **Node Mermaid** path is better suited to **trusted** publishing inputs.
 
 ## Runtime boundaries
 
-- `featherdown` default entry is browser-safe and Mermaid-free.
-- `featherdown/node` is Node-only and includes Mermaid rendering dependencies.
-- `featherdown/node` requires Playwright Chromium setup in the runtime environment.
-- JSR export surface is default-entry focused; Mermaid entry is npm subpath only.
+| Entry | Role |
+| --- | --- |
+| **`featherdown`** | Browser-safe; no Mermaid / Playwright in the default bundle. |
+| **`featherdown/node`** | Node **`Featherdown`**, optional Mermaid SVG, **`parseFile`**. |
+| **`featherdown/advanced`** | Processor + rehype plugins for unified integrations. |
 
-## CSS / Asset Expectations
+Mermaid is **npm subpath–oriented**; JSR usage focuses on the default library surface.
 
-- KaTeX CSS is required for correct math styling.
-- Syntax highlighting output includes highlight.js classes; include matching styles in your app.
-- Mermaid rendering from `featherdown/node` depends on Playwright Chromium availability.
+### Client-side Mermaid previews
 
-## Security and Trust Guidance
+The default `featherdown` entry does not render Mermaid in the browser. If your app needs live Mermaid previews, parse Markdown first, then hydrate `code.language-mermaid` blocks with the `mermaid` package in your own app code. This keeps Mermaid out of Featherdown's browser bundle. Use `featherdown/node` when you want build-time SVG output.
 
-- Input is sanitized with `rehype-sanitize`.
-- Script tags are stripped.
-- The default entry is designed to be browser-safe.
-- The Mermaid entry is Node-only and is better suited to trusted or controlled publishing inputs than arbitrary user-generated content.
-- For general-purpose rendering of untrusted content, prefer the default `featherdown` entry.
-- Always review your final HTML integration, especially if you add custom plugins around the built-in pipeline.
+```ts
+import mermaid from "mermaid";
 
-## Why not just wire unified yourself?
+const result = await featherdown.parse(markdown);
+mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
+```
 
-You absolutely can.
+## Public API (summary)
 
-`featherdown` exists for teams that want:
+**Primary**
 
-- a production-friendly default pipeline
-- deliberate plugin ordering
-- sanitization already considered
-- publishing-oriented features beyond plain Markdown parsing
-- a clean split between browser-safe rendering and Node-only Mermaid rendering
+- **`Featherdown`**, **`FeatherdownOptions`**, **`FeatherdownParseOptions`**, **`FeatherdownResult`**, and related types from **`featherdown`**.
 
-## Public API
+**Node**
 
-Default entry (`featherdown`):
+- **`Featherdown`** from **`featherdown/node`** with optional **`NodeFeatherdownOptions`** / Mermaid config.
 
-- `renderMarkdownToHtml`
-- `renderMarkdown`
-- `renderMarkdownDocument`
-- `createMarkdownProcessor`
-- `rehypeChartBlocks`
-- `rehypeCdnImages`
-- `parseMarkdownFile`
-- `libraryId`
+**Styles (package exports)**
 
-Node-only entry (`featherdown/node`):
+- `featherdown/styles.css`, `featherdown/styles/base.css`, `featherdown/styles/katex.css`, `featherdown/styles/code.css`, `featherdown/styles/highlight.css`
 
-- `renderMarkdownToHtmlWithMermaid`
+**Compatibility**
+
+- Legacy render helpers and **`parseMarkdownFile`** on the default entry; **`renderMarkdownToHtmlWithMermaid`** on **`featherdown/node`**; **`featherdown/advanced`** for processor/plugins.
 
 ## Scripts
 
-| Script                 | Description                       |
-| ---------------------- | --------------------------------- |
-| `npm run build`        | Build ESM artifacts in `dist/`    |
-| `npm test`             | Run Vitest once                   |
-| `npm run test:watch`   | Run Vitest in watch mode          |
-| `npm run lint`         | Run ESLint                        |
-| `npm run typecheck`    | Run TypeScript checks             |
-| `npm run test:exports` | Build and run export smoke checks |
+| Script | Description |
+| --- | --- |
+| `npm run build` | Build ESM artifacts in `dist/` |
+| `npm test` | Run Vitest once |
+| `npm run test:watch` | Vitest watch mode |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | TypeScript `--noEmit` |
+| `npm run test:exports` | Build + export smoke checks |
 
 ## Site
 
-The repository includes a GitHub Pages-friendly site in `site/`.
-
-Run locally:
+A demo site lives in **`site/`**.
 
 ```bash
 npm run site:install
 npm run site:dev
 ```
 
-Build static assets:
+Build:
 
 ```bash
 npm run site:build
 ```
 
-If deployed under a repository subpath, set `SITE_BASE_PATH` at build time:
+GitHub Pages base path:
 
 ```bash
 SITE_BASE_PATH=/featherdown/ npm run site:build
@@ -544,7 +453,7 @@ SITE_BASE_PATH=/featherdown/ npm run site:build
 
 ## Maintainers
 
-CI and publishing are documented in [RELEASING.md](./RELEASING.md).
+CI and publishing: [RELEASING.md](./RELEASING.md).
 
 ## License
 

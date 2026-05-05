@@ -1,89 +1,495 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  renderMarkdown,
-  renderMarkdownDocument,
-  renderMarkdownToHtml,
-  type RenderDiagnostic,
-  type RenderMarkdownDocumentResult,
-} from "featherdown";
+import { useEffect, useMemo, useRef, useState } from "react";
+import CodeMirror from "@uiw/react-codemirror";
+import { markdown as markdownLanguage } from "@codemirror/lang-markdown";
+import { Featherdown, type FeatherdownResult, type RenderDiagnostic } from "featherdown";
 
-type PlaygroundTab = "diagnostics" | "metadata";
-type PrimaryView = "markdown" | "preview";
+type PlaygroundTab = "preview" | "markdown" | "result" | "diagnostics" | "assets";
+type PresetId = "release" | "technical" | "math" | "diagnostics";
 type Theme = "light" | "dark";
 
 const githubUrl = "https://github.com/karuifeather/featherdown";
 const npmUrl = "https://www.npmjs.com/package/featherdown";
-const jsrUrl = "https://jsr.io/@karuifeather/featherdown";
+const releasePresetMarkdown = `---
+title: Spring Platform Update
+description: Faster publishing, cleaner previews, and safer release workflows.
+date: 2026-05-05
+status: published
+tags:
+  - release-notes
+  - product
+author: Product Team
+---
 
-const canonicalExample = `# Building a release note page with featherdown
+# Spring Platform Update
 
-## Why this pipeline exists
+Teams can now draft content once, preview it safely, and ship across docs, changelogs, and in-app release notes from the same Markdown source.
 
-Teams often need one markdown source that can ship to docs, changelogs, and in-app release notes without rebuilding every renderer.
-
-:::tip[Production-safe default]
-Use the browser-safe \`featherdown\` entry for client rendering, then keep Node-only transforms in publishing builds.
+:::tip[Available today]
+The new publishing flow is live for all workspaces.
 :::
 
-## Render entrypoint
+## Highlights
 
-\`\`\`ts title="renderReleaseNotes.ts" {4,8-9} showLineNumbers showCopyButton
-import { renderMarkdownDocument } from "featherdown";
+- Faster rendering across large workspaces.
+- Cleaner preview cards with metadata, excerpts, and reading time.
+- Safer publishing checks before content goes live.
+- One source can now produce page HTML, navigation data, diagnostics, and asset hints.
 
-export async function renderReleaseNotes(markdown: string) {
-  const result = await renderMarkdownDocument(markdown);
-  return {
-    html: result.html,
-    excerpt: result.excerpt,
-    readingMinutes: result.estimatedReadingMinutes,
-  };
+## What changed
+
+Release pages now produce structured publishing data during the same parse that renders the page.
+
+| Output | Used for |
+| --- | --- |
+| \`html\` | Published page body |
+| \`metadata.title\` | Release card heading |
+| \`excerpt\` | Dashboard preview text |
+| \`toc\` | In-page navigation |
+| \`diagnostics\` | Authoring and CI checks |
+| \`assets.styles\` | CSS import hints |
+
+## Rollout progress
+
+\`\`\`chart-line
+{"labels":["Week 1","Week 2","Week 3","Week 4"],"datasets":[{"label":"Pages migrated","data":[12,28,46,73]},{"label":"Preview coverage","data":[18,41,66,88]}]}
+\`\`\`
+
+## Publishing flow
+
+The same Markdown file now drives the full publishing pipeline.
+
+\`\`\`mermaid
+flowchart LR
+  A[Draft markdown] --> B[Featherdown parse]
+  B --> C[Sanitized HTML]
+  B --> D[Metadata]
+  B --> E[TOC]
+  B --> F[Diagnostics]
+  B --> G[Asset hints]
+\`\`\`
+
+:::note[Mermaid preview]
+This demo hydrates Mermaid diagrams client-side for live preview. Build-time SVG rendering is available through \`featherdown/node\`.
+:::
+
+## Release checklist
+
+- [x] Metadata appears on release cards.
+- [x] Table of contents is generated from headings.
+- [x] Diagnostics are visible before publishing.
+- [x] Chart and Mermaid blocks render in the preview.
+- [ ] Final launch image is attached.
+
+## Final note
+
+This update is about reducing duplicate publishing work. Writers stay in Markdown, product teams get structured release data, and engineers keep browser and Node rendering boundaries clean.
+`;
+
+const technicalPresetMarkdown = `---
+title: Markdown Publishing System Design
+description: Architecture notes for rendering one Markdown source into publishable product content.
+status: draft
+tags:
+  - system-design
+  - docs
+  - architecture
+---
+
+# Markdown Publishing System Design
+
+This note describes a publishing pipeline where one Markdown source becomes rendered HTML, metadata, navigation data, diagnostics, and asset hints.
+
+:::note[Design goal]
+The browser preview should stay fast and safe. Build-only work, such as file access and Mermaid SVG rendering, should stay in the Node pipeline.
+:::
+
+## Requirements
+
+| Requirement | Why it matters |
+| --- | --- |
+| Browser-safe rendering | Product previews should not pull in Node-only dependencies. |
+| Structured metadata | Docs cards, changelogs, and search indexes need consistent page data. |
+| TOC generation | Long-form docs need navigation without a second parser. |
+| Diagnostics | Authors should see content issues before publishing. |
+| Explicit CSS assets | Apps should control when and how styles load. |
+
+## High-level architecture
+
+\`\`\`mermaid
+flowchart LR
+  A[Markdown source] --> B[Featherdown parse]
+  B --> C[Sanitized HTML]
+  B --> D[Metadata]
+  B --> E[Headings + TOC]
+  B --> F[Diagnostics]
+  B --> G[Asset hints]
+
+  H[App preview] --> B
+  I[Node publish job] --> J[featherdown/node]
+  J --> K[parseFile]
+  J --> L[Mermaid SVG]
+\`\`\`
+
+## Runtime boundary
+
+The default package entry is optimized for app previews and browser-safe rendering.
+
+\`\`\`ts title="previewRenderer.ts" {3-8} showLineNumbers showCopyButton
+import { Featherdown } from "featherdown";
+
+export const previewRenderer = new Featherdown({
+  frontmatter: "auto",
+  sanitize: true,
+  diagnostics: "warn",
+  headings: {
+    toc: true,
+  },
+});
+\`\`\`
+
+The Node entry is used by publishing jobs that need filesystem access or build-time diagram rendering.
+
+\`\`\`ts title="publishPage.ts" {1,4-8,11} showLineNumbers showCopyButton
+import { Featherdown } from "featherdown/node";
+
+const publisher = new Featherdown({
+  frontmatter: "auto",
+  diagnostics: "strict",
+  mermaid: {
+    render: "svg",
+  },
+});
+
+const result = await publisher.parseFile("./content/system-design.md");
+\`\`\`
+
+:::tip[Boundary rule]
+If a feature needs filesystem access, Chromium, or build-only rendering, keep it in \`featherdown/node\`. The default \`featherdown\` entry should remain browser-safe.
+:::
+
+## Output contract
+
+A single parse returns the document body and the publishing data the app needs.
+
+| Result field | Consumer |
+| --- | --- |
+| \`html\` | Page renderer |
+| \`metadata\` | Search index and preview cards |
+| \`headings\` | Editor tooling |
+| \`toc\` | In-page navigation |
+| \`diagnostics\` | Authoring UI and CI checks |
+| \`assets.styles\` | CSS loading strategy |
+| \`stats\` | Reading-time display |
+
+## Client-side Mermaid previews
+
+For live browser previews, Mermaid can be hydrated by the app after Featherdown renders the Markdown.
+
+\`\`\`ts title="hydrateMermaid.ts" {5-10} showLineNumbers showCopyButton
+import mermaid from "mermaid";
+
+const result = await previewRenderer.parse(markdown);
+
+mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
+
+for (const block of document.querySelectorAll("code.language-mermaid")) {
+  const source = block.textContent ?? "";
+  const { svg } = await mermaid.render(\`diagram-\${crypto.randomUUID()}\`, source);
+  block.closest("pre")?.replaceWith(
+    Object.assign(document.createElement("div"), { innerHTML: svg }),
+  );
 }
 \`\`\`
 
-## Rollout metrics
+:::warning[App-level hydration]
+Client-side Mermaid preview is an application enhancement. It is not bundled into the default Featherdown browser entry.
+:::
 
-\`\`\`chart-line
-{"labels":["Week 1","Week 2","Week 3","Week 4"],"datasets":[{"label":"Adoption %","data":[24,39,58,72]}]}
+## Failure handling
+
+Publishing jobs can treat diagnostics as release blockers.
+
+\`\`\`ts title="publishWithStrictDiagnostics.ts" {2,7,12-15} showLineNumbers showCopyButton
+import {
+  Featherdown,
+  FeatherdownDiagnosticsError,
+} from "featherdown/node";
+
+const publisher = new Featherdown({
+  diagnostics: "strict",
+});
+
+try {
+  await publisher.parseFile("./content/system-design.md");
+} catch (error) {
+  if (error instanceof FeatherdownDiagnosticsError) {
+    console.error(error.diagnostics);
+  }
+
+  throw error;
+}
 \`\`\`
 
-## Publishing checklist
+## Trade-offs
 
-- Validate non-fatal diagnostics before publishing.
-- Use metadata output for article previews and TOC navigation.
-- Keep Mermaid rendering in Node pipelines via \`featherdown/node\`.
+| Choice | Benefit | Cost |
+| --- | --- | --- |
+| Browser-safe default entry | Smaller, safer app previews | Mermaid SVG rendering moves to Node or app hydration |
+| Explicit CSS imports | Apps control styling | Consumers must import package CSS |
+| Diagnostics in result | Editors can show warnings inline | Strict mode needs explicit opt-in |
+| Advanced API in subpath | Main API stays simple | Power users import from \`featherdown/advanced\` |
 
-![Logo](./images/logo.png)
+## Rollout checklist
+
+- [x] Use \`Featherdown\` as the primary parser.
+- [x] Enable \`frontmatter: "auto"\` for publishing metadata.
+- [x] Use warning diagnostics in live previews.
+- [x] Use strict diagnostics in publishing jobs.
+- [x] Keep Node-only diagram rendering in \`featherdown/node\`.
+- [ ] Add visual regression tests for rendered docs.
+
+## Summary
+
+The system keeps the common path simple: one configured parser, one \`parse()\` call, and one rich result.
+
+Build-only work stays out of the browser bundle, while applications still have an escape hatch for live previews and advanced processor control.
 `;
+
+const mathPresetMarkdown = `---
+title: Curved Spacetime Notes
+description: A compact technical note on how general relativity describes gravity as geometry.
+status: draft
+tags:
+  - physics
+  - relativity
+  - spacetime
+---
+
+# Curved Spacetime Notes
+
+General relativity does not describe gravity as an invisible force pulling objects together. It describes gravity as the shape of spacetime itself.
+
+Mass and energy tell spacetime how to curve. Curved spacetime tells matter how to move.
+
+:::note[Core idea]
+In Newtonian gravity, objects fall because a force acts on them. In general relativity, freely falling objects follow the straightest possible paths through curved spacetime.
+:::
+
+## Einstein's field equation
+
+The central equation connects spacetime geometry to energy and momentum:
+
+$$
+G_{\\mu\\nu} + \\Lambda g_{\\mu\\nu}
+=
+\\frac{8\\pi G}{c^4}T_{\\mu\\nu}
+$$
+
+A useful way to read it:
+
+| Term | Meaning |
+| --- | --- |
+| $G_{\\mu\\nu}$ | curvature of spacetime |
+| $\\Lambda g_{\\mu\\nu}$ | cosmological constant term |
+| $T_{\\mu\\nu}$ | energy, momentum, pressure, and stress |
+| $\\frac{8\\pi G}{c^4}$ | coupling between matter and geometry |
+
+The equation is compact, but it carries a huge idea: gravity is not placed inside spacetime. Gravity is spacetime geometry.
+
+## Falling is geometry
+
+A freely falling particle follows a geodesic. In curved spacetime, that path is described by:
+
+$$
+\\frac{d^2 x^\\mu}{d\\tau^2}
++
+\\Gamma^\\mu_{\\alpha\\beta}
+\\frac{dx^\\alpha}{d\\tau}
+\\frac{dx^\\beta}{d\\tau}
+=
+0
+$$
+
+The symbol $\\Gamma^\\mu_{\\alpha\\beta}$ captures how coordinates bend and shift from point to point. If spacetime is flat, the path looks like ordinary straight-line motion. If spacetime is curved, the straightest path can look like an orbit or a fall.
+
+:::tip[Why orbits happen]
+The Moon is not constantly "correcting" its path around Earth. It is moving along a curved spacetime path shaped mostly by Earth's mass.
+:::
+
+## Time runs differently near mass
+
+Near a non-rotating spherical mass, gravitational time dilation can be approximated by:
+
+$$
+\\Delta t_\\text{far}
+=
+\\frac{\\Delta t_\\text{near}}
+{\\sqrt{1 - \\frac{2GM}{rc^2}}}
+$$
+
+As $r$ gets smaller, the denominator shrinks. That means a clock closer to the mass ticks more slowly compared with a clock far away.
+
+This effect is tiny near Earth's surface, but it matters for precision systems like satellite navigation.
+
+## The Schwarzschild radius
+
+For a mass $M$, the Schwarzschild radius is:
+
+$$
+r_s = \\frac{2GM}{c^2}
+$$
+
+If an object's mass is compressed within this radius, the escape velocity reaches the speed of light. That boundary is the event horizon of a non-rotating black hole.
+
+\`\`\`ts title="schwarzschildRadius.ts" {6} showLineNumbers showCopyButton
+const G = 6.67430e-11;
+const c = 299_792_458;
+
+export function schwarzschildRadius(massKg: number) {
+  return (2 * G * massKg) / c ** 2;
+}
+\`\`\`
+
+## A compact mental model
+
+- Matter does not simply sit inside spacetime.
+- Matter changes spacetime's geometry.
+- Objects follow geodesics through that geometry.
+- Strong gravity also changes the rate at which time passes.
+
+:::warning[Common misconception]
+General relativity does not say "gravity is fake." It says the thing we experience as gravity is better modeled as curvature than as a traditional force.
+:::
+
+## Final intuition
+
+A planet orbiting a star is not being dragged around by a mysterious thread. It is moving through a curved four-dimensional landscape, following the straightest path available to it.
+`;
+
+const diagnosticsPresetMarkdown = `---
+title: Release QA Diagnostics
+description: A draft release note with intentional authoring issues for diagnostics testing.
+status: review
+tags:
+  - diagnostics
+  - qa
+  - release-notes
+---
+
+# Release QA Diagnostics
+
+This draft intentionally includes a few content issues so the preview can show how diagnostics help authors catch problems before publishing.
+
+:::warning[Review mode]
+This page is safe to preview, but it should not be published until the diagnostics panel is clean.
+:::
+
+## Broken rollout chart
+
+The chart below has invalid JSON. Featherdown should keep rendering the page, but surface a diagnostic so the editor or CI pipeline can point the author to the issue.
+
+\`\`\`chart-line
+{"labels":["Week 1","Week 2","Week 3"],"datasets":[{"label":"Adoption","data":[12,28,}
+\`\`\`
+
+## Missing chart data
+
+This chart has the right fence type, but the payload is incomplete for a useful chart preview.
+
+\`\`\`chart-bar
+{"labels":["Docs","Changelog","In-app"],"datasets":[]}
+\`\`\`
+
+## Valid content still renders
+
+Even when diagnostics are present, normal Markdown should continue to render in warning mode.
+
+| Check | Status |
+| --- | --- |
+| Front matter parsed | Ready |
+| HTML preview | Ready |
+| Diagnostics panel | Needs review |
+| Publish gate | Block in strict mode |
+
+\`\`\`ts title="diagnosticsMode.ts" {4,8-9} showLineNumbers showCopyButton
+import { Featherdown } from "featherdown";
+
+const featherdown = new Featherdown({
+  diagnostics: "warn",
+});
+
+const result = await featherdown.parse(markdown);
+
+console.log(result.diagnostics);
+\`\`\`
+
+:::tip[Use strict mode in CI]
+In a publishing pipeline, switch to \`diagnostics: "strict"\` so diagnostics fail the build instead of only appearing in the result.
+:::
+
+## Author checklist
+
+- [x] Confirm the page still previews.
+- [x] Review diagnostics in the side panel.
+- [ ] Fix invalid chart JSON.
+- [ ] Add real chart data.
+- [ ] Re-run strict diagnostics before publishing.
+`;
+
+const presetMap: Record<PresetId, { label: string; markdown: string }> = {
+  release: { label: "Release note", markdown: releasePresetMarkdown },
+  technical: { label: "Technical doc", markdown: technicalPresetMarkdown },
+  math: { label: "Math post", markdown: mathPresetMarkdown },
+  diagnostics: { label: "Diagnostics example", markdown: diagnosticsPresetMarkdown },
+};
 
 const defaultManifest = {
   kind: "post",
   slug: "playground",
   manifest: {
     map: {
-      "post/playground/images/logo.png": {
-        url: "https://cdn.example.com/featherdown/logo.hash.png",
-      },
+      "post/playground/images/logo.png": { url: "https://cdn.example.com/featherdown/logo.hash.png" },
     },
   },
 };
 
-const featureGroups = [
+const storyCards = [
   {
-    title: "Ship browser-safe output by default",
-    body: "Sanitized HTML, stable contracts, and honest runtime boundaries make production theming predictable.",
-    bullets: ["Callouts and code UX hooks", "Chart mount placeholders", "Manifest-based image rewriting"],
+    title: "Metadata",
+    body: "Front matter becomes typed publishing metadata.",
+    sample: "result.metadata.title",
   },
   {
-    title: "Turn markdown into usable document data",
-    body: "Extract toc, headings, excerpt, word count, and reading time from the same render pass.",
-    bullets: ["Metadata for previews and navigation", "Diagnostics for author QA", "Composable processor/plugin exports"],
+    title: "Navigation",
+    body: "Headings and TOC come from the same parse.",
+    sample: "result.toc",
+  },
+  {
+    title: "Diagnostics",
+    body: "Warn in editors or fail builds with strict mode.",
+    sample: "result.diagnostics",
+  },
+  {
+    title: "Style assets",
+    body: "Know which exported CSS paths the rendered document needs.",
+    sample: "result.assets.styles",
   },
 ];
 
 const installSnippet = "npm install featherdown";
 
-function compactJson(value: unknown): string {
-  return JSON.stringify(value, null, 2);
+function encodeUtf8Base64(value: string): string {
+  return btoa(
+    encodeURIComponent(value).replace(/%([0-9A-F]{2})/g, (_, hex: string) =>
+      String.fromCharCode(Number.parseInt(hex, 16)),
+    ),
+  );
+}
+
+function decodeUtf8Base64(value: string): string {
+  return decodeURIComponent(
+    Array.from(atob(value), (char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0").toUpperCase()}`).join(""),
+  );
 }
 
 export default function App() {
@@ -93,22 +499,32 @@ export default function App() {
     if (stored === "light" || stored === "dark") return stored;
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
-  const [markdown, setMarkdown] = useState(canonicalExample);
-  const [primaryView, setPrimaryView] = useState<PrimaryView>("preview");
-  const [activeTab, setActiveTab] = useState<PlaygroundTab>("diagnostics");
-  const [isDataPanelOpen, setIsDataPanelOpen] = useState(false);
-  const [htmlOnly, setHtmlOnly] = useState("");
-  const [documentResult, setDocumentResult] = useState<RenderMarkdownDocumentResult | null>(null);
-  const [diagnostics, setDiagnostics] = useState<RenderDiagnostic[]>([]);
+  const [markdown, setMarkdown] = useState(releasePresetMarkdown);
+  const [activeTab, setActiveTab] = useState<PlaygroundTab>("result");
+  const [activePreset, setActivePreset] = useState<PresetId>("release");
+  const [result, setResult] = useState<FeatherdownResult | null>(null);
+  const featherdown = useMemo(
+    () =>
+      new Featherdown({
+        ...defaultManifest,
+        frontmatter: "auto",
+      }),
+    [],
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isRendering, setIsRendering] = useState(false);
   const [installCopyLabel, setInstallCopyLabel] = useState("Copy install snippet");
   const [heroCopyLabel, setHeroCopyLabel] = useState("Click to copy");
-  const [resetLabel, setResetLabel] = useState("Reset example");
+  const [resetLabel, setResetLabel] = useState("Reset preset");
   const previewRef = useRef<HTMLDivElement>(null);
-  const headingCount = documentResult?.headings.length ?? 0;
-  const wordCount = documentResult?.wordCount ?? 0;
+  const mermaidIdRef = useRef(0);
+
+  const diagnostics = result?.diagnostics ?? [];
+  const headingCount = result?.headings.length ?? 0;
+  const wordCount = result?.wordCount ?? 0;
   const diagnosticCount = diagnostics.length;
+  const heroBadges = ["Browser-safe default", "Front matter metadata", "Strict diagnostics", "Explicit CSS", "Node build tools"];
+  const outputTabs: PlaygroundTab[] = ["result", "preview", "markdown", "diagnostics", "assets"];
 
   useEffect(() => {
     let cancelled = false;
@@ -116,50 +532,19 @@ export default function App() {
     const encoded = params.get("md");
     if (!encoded) return;
     try {
-      const decoded = atob(encoded);
-      if (!cancelled) {
-        setMarkdown(decoded);
-      }
+      const decoded = decodeUtf8Base64(encoded);
+      if (!cancelled) setMarkdown(decoded);
     } catch {
-      if (!cancelled) {
-        setErrorMessage("Could not decode URL state.");
-      }
+      if (!cancelled) setErrorMessage("Could not decode URL state.");
     }
     return () => {
       cancelled = true;
     };
   }, []);
 
-  async function copyTextWithFeedback(
-    value: string,
-    setLabel: (next: string) => void,
-    successText: string,
-    idleText: string,
-  ) {
-    try {
-      await navigator.clipboard.writeText(value);
-      setLabel(successText);
-    } catch {
-      setLabel("Copy failed");
-    } finally {
-      window.setTimeout(() => {
-        setLabel(idleText);
-      }, 1100);
-    }
-  }
-
-  function resetExample() {
-    setMarkdown(canonicalExample);
-    setPrimaryView("markdown");
-    setResetLabel("Example reset");
-    window.setTimeout(() => {
-      setResetLabel("Reset example");
-    }, 1100);
-  }
-
   useEffect(() => {
     const next = new URL(window.location.href);
-    next.searchParams.set("md", btoa(markdown));
+    next.searchParams.set("md", encodeUtf8Base64(markdown));
     window.history.replaceState({}, "", next.toString());
   }, [markdown]);
 
@@ -174,33 +559,25 @@ export default function App() {
       setIsRendering(true);
       setErrorMessage(null);
       try {
-        const [html, full, document] = await Promise.all([
-          renderMarkdownToHtml(markdown, defaultManifest),
-          renderMarkdown(markdown, defaultManifest),
-          renderMarkdownDocument(markdown, defaultManifest),
-        ]);
-        if (cancelled) return;
-        setHtmlOnly(html);
-        setDiagnostics(full.diagnostics);
-        setDocumentResult(document);
+        const parsed = await featherdown.parse(markdown);
+        if (!cancelled) setResult(parsed);
       } catch (error) {
-        if (cancelled) return;
-        setErrorMessage(error instanceof Error ? error.message : "Unknown render error.");
+        if (!cancelled) setErrorMessage(error instanceof Error ? error.message : "Unknown render error.");
       } finally {
-        if (!cancelled) {
-          setIsRendering(false);
-        }
+        if (!cancelled) setIsRendering(false);
       }
     }
     runRender();
     return () => {
       cancelled = true;
     };
-  }, [markdown]);
+  }, [markdown, featherdown]);
 
   useEffect(() => {
+    if (activeTab !== "preview") return;
     const root = previewRef.current;
     if (!root) return;
+
     const onClick = async (event: MouseEvent) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
@@ -208,12 +585,9 @@ export default function App() {
       if (!button) return;
       const copyTarget = button.getAttribute("data-code-copy-target");
       if (!copyTarget) return;
-      const codeNode = root.querySelector<HTMLElement>(
-        `[data-code-copy-target="${copyTarget}"]`,
-      );
+      const codeNode = root.querySelector<HTMLElement>(`[data-code-copy-target="${copyTarget}"]`);
       if (!codeNode || !(codeNode instanceof HTMLElement)) return;
-      const codeText = codeNode.innerText;
-      await navigator.clipboard.writeText(codeText);
+      await navigator.clipboard.writeText(codeNode.innerText);
       button.textContent = "Copied";
       window.setTimeout(() => {
         button.textContent = "Copy";
@@ -223,6 +597,152 @@ export default function App() {
     return () => root.removeEventListener("click", onClick);
   }, []);
 
+  useEffect(() => {
+    const root = previewRef.current;
+    if (!root) return;
+    const mounts = root.querySelectorAll<HTMLElement>(".chart-mount");
+    mounts.forEach((mount) => {
+      const rawType = String(mount.dataset.chart ?? "chart");
+      const rawData = String(mount.dataset.chartData ?? "{}");
+      let labels = 0;
+      let datasets = 0;
+      try {
+        const parsed = JSON.parse(rawData) as { labels?: unknown[]; datasets?: unknown[] };
+        labels = Array.isArray(parsed.labels) ? parsed.labels.length : 0;
+        datasets = Array.isArray(parsed.datasets) ? parsed.datasets.length : 0;
+      } catch {
+        labels = 0;
+        datasets = 0;
+      }
+      mount.innerHTML = "";
+      mount.classList.add("chart-placeholder");
+      const title = document.createElement("strong");
+      title.textContent = `chart-${rawType}`;
+      const meta = document.createElement("span");
+      meta.textContent = `${datasets} datasets · ${labels} labels`;
+      const bars = document.createElement("div");
+      bars.className = "chart-mini-bars";
+      for (let idx = 0; idx < Math.max(4, Math.min(8, labels || 4)); idx += 1) {
+        const bar = document.createElement("i");
+        bar.style.height = `${28 + ((idx * 17) % 42)}%`;
+        bars.append(bar);
+      }
+      const hint = document.createElement("small");
+      hint.textContent = "Demo placeholder - hydrate with your chart runtime.";
+      mount.append(title, meta, bars, hint);
+    });
+  }, [activeTab, result?.html]);
+
+  useEffect(() => {
+    if (activeTab !== "preview") return;
+    if (!previewRef.current) return;
+
+    let cancelled = false;
+
+    async function hydrateMermaidBlocks() {
+      const rootEl = previewRef.current;
+      if (!rootEl) return;
+      const hasMermaidBlock = rootEl.querySelector(
+        ".code-block pre code.language-mermaid, .code-block pre code[class*='language-mermaid'], pre code.language-mermaid, pre code[class*='language-mermaid']",
+      );
+      if (!hasMermaidBlock) return;
+      const candidates = Array.from(
+        rootEl.querySelectorAll<HTMLElement>(
+          ".code-block pre code.language-mermaid, .code-block pre code[class*='language-mermaid'], pre code.language-mermaid, pre code[class*='language-mermaid']",
+        ),
+      );
+
+      let mermaidModule: { default: { initialize: (config: object) => void; render: (id: string, code: string) => Promise<{ svg: string }> } };
+      try {
+        mermaidModule = (await import("mermaid")) as typeof mermaidModule;
+      } catch {
+        return;
+      }
+      if (cancelled) return;
+
+      mermaidModule.default.initialize({
+        startOnLoad: false,
+        securityLevel: "strict",
+        theme: theme === "dark" ? "dark" : "default",
+      });
+
+      for (const codeNode of candidates) {
+        if (cancelled) break;
+        if (codeNode.dataset.mermaidHydrated === "true") continue;
+        const source = codeNode.textContent?.trim();
+        if (!source) continue;
+        codeNode.dataset.mermaidHydrated = "true";
+
+        const block = codeNode.closest<HTMLElement>(".code-block") ?? codeNode.closest<HTMLElement>("pre");
+        if (!block) continue;
+
+        try {
+          mermaidIdRef.current += 1;
+          const renderId = `fd-mermaid-${mermaidIdRef.current}`;
+          const { svg } = await mermaidModule.default.render(renderId, source);
+          if (cancelled) break;
+
+          const wrapper = document.createElement("figure");
+          wrapper.className = "mermaid-diagram-card";
+          const body = document.createElement("div");
+          body.className = "mermaid-diagram-body";
+          body.innerHTML = svg;
+          const caption = document.createElement("figcaption");
+          caption.textContent = "Client-side Mermaid preview in demo.";
+          wrapper.append(body, caption);
+          block.replaceWith(wrapper);
+        } catch {
+          block.classList.add("mermaid-source-fallback");
+          const note = document.createElement("p");
+          note.className = "mermaid-fallback-note";
+          note.textContent = "Mermaid preview failed. Showing source block.";
+          block.insertAdjacentElement("afterend", note);
+        }
+      }
+    }
+
+    void hydrateMermaidBlocks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, result?.html, theme]);
+
+  const resultSummary = useMemo(() => {
+    if (!result) return null;
+    return {
+      metadata: result.metadata,
+      stats: result.stats,
+      tocItems: result.toc.length,
+      headingItems: result.headings.length,
+      excerpt: result.excerpt,
+      frontmatterKeys: Object.keys(result.frontmatter),
+    };
+  }, [result]);
+
+  async function copyTextWithFeedback(value: string, setLabel: (next: string) => void, successText: string, idleText: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setLabel(successText);
+    } catch {
+      setLabel("Copy failed");
+    } finally {
+      window.setTimeout(() => setLabel(idleText), 1100);
+    }
+  }
+
+  function applyPreset(preset: PresetId) {
+    setActivePreset(preset);
+    setMarkdown(presetMap[preset].markdown);
+  }
+
+  function resetPreset() {
+    setMarkdown(presetMap[activePreset].markdown);
+    setActiveTab("result");
+    setResetLabel("Example reset");
+    window.setTimeout(() => setResetLabel("Reset preset"), 1100);
+  }
+
   return (
     <div className="app-shell">
       <header className="hero">
@@ -231,263 +751,73 @@ export default function App() {
             <div className="hero-main">
               <div className="hero-top-row">
                 <p className="eyebrow">featherdown</p>
-                <button
-                  className="theme-toggle"
-                  type="button"
-                  onClick={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}
-                >
+                <button className="theme-toggle" type="button" onClick={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}>
                   {theme === "dark" ? "Light" : "Dark"}
                 </button>
               </div>
-              <h1>Publish markdown like product content, not loose documentation.</h1>
+              <h1>Markdown in. Publishable content out.</h1>
               <p className="hero-copy">
-                featherdown turns markdown into sanitized article HTML plus diagnostics
-                and metadata, so your docs and release surfaces ship with the same
-                predictable contracts.
+                Featherdown turns one Markdown source into sanitized HTML, metadata, table-of-contents data, diagnostics, and style asset
+                hints - without making you wire a full unified pipeline.
               </p>
               <div className="hero-metrics" aria-label="Package highlights">
-                <span>Browser-safe defaults</span>
-                <span>Structured metadata</span>
-                <span>Stable HTML contracts</span>
+                {heroBadges.map((badge) => (
+                  <span key={badge}>{badge}</span>
+                ))}
               </div>
               <div className="cta-row">
-                <a className="cta-primary" href="#playground">
-                  Open live playground
-                </a>
-                <a href={githubUrl} target="_blank" rel="noreferrer">
-                  GitHub
-                </a>
-                <a href={npmUrl} target="_blank" rel="noreferrer">
-                  npm
-                </a>
-                <a href={jsrUrl} target="_blank" rel="noreferrer">
-                  JSR
-                </a>
+                <button
+                  type="button"
+                  className="cta-primary cta-install"
+                  onClick={() => copyTextWithFeedback(installSnippet, setHeroCopyLabel, "Copied command", "Copy install")}
+                >
+                  npm install featherdown
+                </button>
+                <a className="cta-primary" href="#playground">Open playground</a>
+                <a href={githubUrl} target="_blank" rel="noreferrer">GitHub</a>
               </div>
+              <p className="copy-hint">{heroCopyLabel}</p>
             </div>
             <aside className="hero-aside">
-              <p className="hero-aside-label">Package proof</p>
-              <p className="hero-proof-title">Drop-in install, production-safe output</p>
-              <button
-                className="hero-install-copy"
-                aria-label="Copy install command"
-                onClick={() =>
-                  copyTextWithFeedback(
-                    installSnippet,
-                    setHeroCopyLabel,
-                    "Copied command",
-                    "Click to copy",
-                  )
-                }
-              >
-                <pre>
-                  <code>{installSnippet}</code>
-                </pre>
-              </button>
-              <p className="copy-hint">{heroCopyLabel}</p>
+              <p className="hero-aside-label">One parse transformation</p>
+              <p className="hero-proof-title">Markdown source</p>
               <ul className="hero-proof-list">
-                <li>Sanitized article HTML from the default browser-safe entry.</li>
-                <li>Diagnostics and metadata from the same markdown input.</li>
-                <li>Mermaid stays Node-only through <code>featherdown/node</code>.</li>
+                <li>front matter</li>
+                <li>headings</li>
+                <li>code</li>
+                <li>charts</li>
+              </ul>
+              <p className="hero-arrow">→ FeatherdownResult</p>
+              <ul className="hero-proof-list">
+                <li>html</li>
+                <li>metadata</li>
+                <li>toc</li>
+                <li>diagnostics</li>
+                <li>assets.styles</li>
               </ul>
               <div className="hero-proof-stats" aria-label="Live render proof">
-                <article>
-                  <span>Headings</span>
-                  <strong>{headingCount}</strong>
-                </article>
-                <article>
-                  <span>Word count</span>
-                  <strong>{wordCount}</strong>
-                </article>
-                <article>
-                  <span>Diagnostics</span>
-                  <strong>{diagnosticCount}</strong>
-                </article>
+                <article><span>Headings</span><strong>{headingCount}</strong></article>
+                <article><span>Word count</span><strong>{wordCount}</strong></article>
+                <article><span>Diagnostics</span><strong>{diagnosticCount}</strong></article>
               </div>
-              <p className="hero-support">
-                This live workbench renders the canonical publishing example with the real package APIs.
-              </p>
             </aside>
           </div>
         </div>
       </header>
 
       <main>
-        <section id="playground" className="section">
-          <div className="container">
-            <div className="section-head">
-              <h2>Live playground</h2>
-              <p>
-                One realistic article example rendered in-browser with the default{" "}
-                <code>featherdown</code> entrypoint.
-              </p>
-            </div>
-
-            <div className="playground-actions">
-              <div className="control-group">
-                <span className="control-label">Primary view</span>
-                <div className="preset-row" role="tablist" aria-label="Primary playground view">
-                  <button
-                    id="preview-tab"
-                    role="tab"
-                    aria-controls="preview-panel"
-                    aria-selected={primaryView === "preview"}
-                    tabIndex={primaryView === "preview" ? 0 : -1}
-                    className={primaryView === "preview" ? "active" : ""}
-                    onClick={() => setPrimaryView("preview")}
-                  >
-                    Preview
-                  </button>
-                  <button
-                    id="markdown-tab"
-                    role="tab"
-                    aria-controls="markdown-panel"
-                    aria-selected={primaryView === "markdown"}
-                    tabIndex={primaryView === "markdown" ? 0 : -1}
-                    className={primaryView === "markdown" ? "active" : ""}
-                    onClick={() => setPrimaryView("markdown")}
-                  >
-                    Markdown
-                  </button>
-                </div>
-              </div>
-              <div className="control-group control-group-end">
-                <span className="control-label">Quick action</span>
-                <div className="preset-row">
-                  <button
-                    className="copy-install"
-                    onClick={() => setIsDataPanelOpen((open) => !open)}
-                  >
-                    {isDataPanelOpen ? "Hide data panel" : "Show data panel"}
-                  </button>
-                  <button className="copy-install" onClick={resetExample}>
-                    {resetLabel}
-                  </button>
-                  <button
-                    className="copy-install"
-                    onClick={() =>
-                      copyTextWithFeedback(
-                        installSnippet,
-                        setInstallCopyLabel,
-                        "Copied install",
-                        "Copy install snippet",
-                      )
-                    }
-                  >
-                    {installCopyLabel}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="playground-shell">
-              <div className="playground-grid">
-                {primaryView === "markdown" ? (
-                  <article
-                    id="markdown-panel"
-                    role="tabpanel"
-                    aria-labelledby="markdown-tab"
-                    className="panel editor-panel"
-                  >
-                    <h3>Markdown input</h3>
-                    <textarea
-                      aria-label="Markdown editor"
-                      value={markdown}
-                      onChange={(event) => {
-                        setMarkdown(event.target.value);
-                      }}
-                    />
-                  </article>
-                ) : (
-                  <article
-                    id="preview-panel"
-                    role="tabpanel"
-                    aria-labelledby="preview-tab"
-                    className="panel preview-panel"
-                  >
-                    <div className="preview-head">
-                      <p className="preview-kicker">Live output</p>
-                      <h3>Rendered preview</h3>
-                    </div>
-                    {errorMessage ? (
-                      <p className="error-message">{errorMessage}</p>
-                    ) : (
-                      <div
-                        ref={previewRef}
-                        className="preview markdown-surface"
-                        dangerouslySetInnerHTML={{ __html: documentResult?.html ?? htmlOnly }}
-                      />
-                    )}
-                  </article>
-                )}
-              </div>
-
-              {isDataPanelOpen && (
-                <article className="panel secondary-panel">
-                  <div className="tabs" role="tablist" aria-label="Playground data views">
-                    <button
-                      role="tab"
-                      aria-selected={activeTab === "diagnostics"}
-                      className={activeTab === "diagnostics" ? "active" : ""}
-                      onClick={() => setActiveTab("diagnostics")}
-                    >
-                      Diagnostics
-                    </button>
-                    <button
-                      role="tab"
-                      aria-selected={activeTab === "metadata"}
-                      className={activeTab === "metadata" ? "active" : ""}
-                      onClick={() => setActiveTab("metadata")}
-                    >
-                      Document metadata
-                    </button>
-                  </div>
-                  {isRendering && <p className="muted">Rendering…</p>}
-                  {!isRendering && activeTab === "diagnostics" && (
-                    <pre className="json-panel">
-                      {diagnostics.length > 0
-                        ? compactJson(diagnostics)
-                        : "No diagnostics were produced for this input."}
-                    </pre>
-                  )}
-                  {!isRendering && activeTab === "metadata" && (
-                    <pre className="json-panel">
-                      {documentResult
-                        ? compactJson({
-                            toc: documentResult.toc,
-                            headings: documentResult.headings,
-                            excerpt: documentResult.excerpt,
-                            wordCount: documentResult.wordCount,
-                            estimatedReadingMinutes: documentResult.estimatedReadingMinutes,
-                          })
-                        : "No render metadata yet."}
-                    </pre>
-                  )}
-                </article>
-              )}
-            </div>
-          </div>
-        </section>
-
         <section className="section muted-section">
           <div className="container">
             <div className="section-head">
-              <h2>Built for publishing surfaces</h2>
-              <p>Concise primitives that scale from simple rendering to full article pipelines.</p>
+              <h2>More than Markdown to HTML</h2>
+              <p>Basic Markdown parsers stop at HTML. Featherdown gives publishing apps the document data they usually build by hand.</p>
             </div>
             <div className="feature-grid">
-              {featureGroups.map((group) => (
-                <article
-                  key={group.title}
-                  className={`feature-card ${group.title.includes("browser-safe") ? "feature-card-strong" : ""}`}
-                >
-                  <h3>{group.title}</h3>
-                  <p>{group.body}</p>
-                  <ul>
-                    {group.bullets.map((bullet) => (
-                      <li key={bullet}>{bullet}</li>
-                    ))}
-                  </ul>
+              {storyCards.map((card) => (
+                <article key={card.title} className="feature-card">
+                  <h3>{card.title}</h3>
+                  <p>{card.body}</p>
+                  <pre><code>{card.sample}</code></pre>
                 </article>
               ))}
             </div>
@@ -497,43 +827,299 @@ export default function App() {
         <section className="section">
           <div className="container">
             <div className="section-head">
-              <h2>API path</h2>
-              <p>Start simple, then move up only when you need richer output.</p>
+              <h2>Quick start</h2>
+              <p>Install once, parse once, and ship HTML plus publishing data.</p>
+            </div>
+            <article className="feature-card feature-card-strong">
+              <pre className="quickstart-snippet"><code>{`npm install featherdown`}</code></pre>
+              <pre className="quickstart-snippet"><code>{`import { Featherdown } from "featherdown";
+import "featherdown/styles.css";
+
+const featherdown = new Featherdown({
+  frontmatter: "auto",
+});
+
+const result = await featherdown.parse(markdown);`}</code></pre>
+            </article>
+          </div>
+        </section>
+
+        <section className="section muted-section">
+          <div className="container">
+            <div className="section-head">
+              <h2>Style it your way</h2>
+              <p>
+                Featherdown ships CSS as explicit package exports, but it does not inject styles into your app. Start with the all-in
+                stylesheet, load only the pieces you need, or bring your own Markdown and code-block theme.
+              </p>
+            </div>
+            <div className="feature-grid style-grid">
+              <article className="feature-card">
+                <h3>Fastest setup</h3>
+                <pre><code>{`import "featherdown/styles.css";`}</code></pre>
+              </article>
+              <article className="feature-card">
+                <h3>Selective imports</h3>
+                <pre><code>{`import "featherdown/styles/base.css";
+import "featherdown/styles/katex.css";
+import "featherdown/styles/code.css";`}</code></pre>
+              </article>
+              <article className="feature-card">
+                <h3>Custom theme</h3>
+                <pre><code>{`// Keep Featherdown's baseline layout styles if you want them.
+import "featherdown/styles/base.css";
+
+import "./markdown-theme.css";
+import "./code-theme.css";`}</code></pre>
+                <p>Start from <code>base.css</code> and override it, or skip it and fully own rendered Markdown styles in your app.</p>
+                <p>Code highlighting uses highlight.js-style <code>hljs</code> token classes, so custom themes can target <code>.hljs-keyword</code>, <code>.hljs-string</code>, and <code>.hljs-comment</code>.</p>
+              </article>
+            </div>
+            <p className="style-note">
+              For SSR and static publishing pipelines, <code>result.assets.styles</code> reports the exported style paths needed by the
+              rendered document.
+            </p>
+          </div>
+        </section>
+
+        <section id="playground" className="section">
+          <div className="container">
+            <div className="section-head">
+              <h2>Live playground</h2>
+              <p>Proof of the output contract from one parse call.</p>
+              <p className="playground-note">
+                Client-side Mermaid preview in demo. Build-time Mermaid SVG rendering is available via <code>featherdown/node</code>.
+              </p>
+            </div>
+
+            <div className="playground-actions">
+              <div className="control-group">
+                <span className="control-label">Presets</span>
+                <div className="preset-row">
+                  {(Object.keys(presetMap) as PresetId[]).map((preset) => (
+                    <button key={preset} className={activePreset === preset ? "active" : ""} onClick={() => applyPreset(preset)}>
+                      {presetMap[preset].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="control-group control-group-end">
+                <span className="control-label">Quick actions</span>
+                <div className="preset-row">
+                  <button className="copy-install" onClick={resetPreset}>{resetLabel}</button>
+                  <button
+                    className="copy-install"
+                    onClick={() => copyTextWithFeedback(installSnippet, setInstallCopyLabel, "Copied install", "Copy install snippet")}
+                  >
+                    {installCopyLabel}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="playground-tabs" role="tablist" aria-label="Playground tabs">
+              {outputTabs.map((tab) => (
+                <button key={tab} role="tab" className={activeTab === tab ? "active" : ""} aria-selected={activeTab === tab} onClick={() => setActiveTab(tab)}>
+                  {tab[0].toUpperCase() + tab.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            <div className="playground-shell">
+              <div className="playground-grid">
+                {activeTab === "preview" && (
+                  <article className="panel preview-panel">
+                    {errorMessage ? (
+                      <p className="error-message">{errorMessage}</p>
+                    ) : (
+                      <div ref={previewRef} className="preview markdown-surface featherdown-content" dangerouslySetInnerHTML={{ __html: result?.html ?? "" }} />
+                    )}
+                  </article>
+                )}
+
+                {activeTab === "markdown" && (
+                  <article className="panel editor-panel">
+                    <div className="playground-editor">
+                      <CodeMirror
+                        className="playground-codemirror"
+                        value={markdown}
+                        height="100%"
+                        extensions={[markdownLanguage()]}
+                        basicSetup={{ foldGutter: false, highlightActiveLine: false, highlightActiveLineGutter: false }}
+                        onChange={(value) => setMarkdown(value)}
+                        aria-label="Markdown editor"
+                      />
+                    </div>
+                  </article>
+                )}
+
+                {activeTab === "result" && (
+                  <article className="panel secondary-panel">
+                    {isRendering && <p className="muted">Rendering...</p>}
+                    {!isRendering && resultSummary && (
+                      <div className="result-grid result-summary-grid">
+                        <section className="result-card">
+                          <h3>Metadata</h3>
+                          <ul>
+                            <li>title: {resultSummary.metadata.title ?? "—"}</li>
+                            <li>description: {resultSummary.metadata.description ?? "—"}</li>
+                            <li>status: {resultSummary.metadata.status ?? "—"}</li>
+                            <li>tags: {resultSummary.metadata.tags?.join(", ") ?? "—"}</li>
+                          </ul>
+                        </section>
+                        <section className="result-card">
+                          <h3>Stats</h3>
+                          <ul>
+                            <li>word count: {resultSummary.stats.wordCount}</li>
+                            <li>reading time: {resultSummary.stats.readingTimeMinutes} min</li>
+                          </ul>
+                        </section>
+                        <section className="result-card">
+                          <h3>Navigation</h3>
+                          <ul>
+                            <li>toc items: {resultSummary.tocItems}</li>
+                            <li>headings: {resultSummary.headingItems}</li>
+                          </ul>
+                          <p className="muted">
+                            {result?.toc[0]
+                              ? `First item: ${result.toc[0].text} (h${result.toc[0].depth})`
+                              : "No toc entries for this document."}
+                          </p>
+                        </section>
+                        <section className="result-card">
+                          <h3>Diagnostics</h3>
+                          <p className="muted">
+                            {diagnosticCount === 0 ? "Status: clean (0 diagnostics)" : `Status: needs review (${diagnosticCount} diagnostics)`}
+                          </p>
+                          <p className="muted">{diagnostics[0] ? `Latest: ${diagnostics[0].code} - ${diagnostics[0].message}` : "No warnings for this parse."}</p>
+                        </section>
+                        <section className="result-card">
+                          <h3>Assets</h3>
+                          <ul>
+                            {(result?.assets.styles ?? []).length > 0
+                              ? (result?.assets.styles ?? []).map((style) => <li key={style}><code>{style}</code></li>)
+                              : <li>No exported style paths</li>}
+                          </ul>
+                          <p className="muted">
+                            enabled features:{" "}
+                            {Object.entries(result?.assets.features ?? {})
+                              .filter(([, enabled]) => Boolean(enabled))
+                              .map(([feature]) => feature)
+                              .join(", ") || "none"}
+                          </p>
+                        </section>
+                        <section className="result-card">
+                          <h3>Front matter extraction</h3>
+                          <p className="muted">{resultSummary.frontmatterKeys.length ? resultSummary.frontmatterKeys.join(", ") : "None"}</p>
+                        </section>
+                        <section className="result-card">
+                          <h3>Excerpt</h3>
+                          <p className="muted">{resultSummary.excerpt ?? "No excerpt generated."}</p>
+                        </section>
+                      </div>
+                    )}
+                  </article>
+                )}
+
+                {activeTab === "diagnostics" && (
+                  <article className="panel secondary-panel">
+                    <h3>Diagnostics</h3>
+                    {diagnostics.length === 0 ? (
+                      <p className="muted">No diagnostics were produced. Try the Diagnostics example preset.</p>
+                    ) : (
+                      <ul className="diagnostics-list">
+                        {diagnostics.map((item: RenderDiagnostic, idx) => (
+                          <li key={`${item.code}-${idx}`}>
+                            <code>{item.code}</code> {item.message} <span>({item.source})</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </article>
+                )}
+
+                {activeTab === "assets" && (
+                  <article className="panel secondary-panel">
+                    <h3>Assets and feature hints</h3>
+                    <div className="assets-grid">
+                      <section>
+                        <h4>Styles</h4>
+                        <ul>
+                          {(result?.assets.styles ?? []).map((style) => (
+                            <li key={style}><code>{style}</code></li>
+                          ))}
+                        </ul>
+                      </section>
+                      <section>
+                        <h4>Features</h4>
+                        <ul>
+                          <li>math: {String(result?.assets.features.math ?? false)}</li>
+                          <li>code: {String(result?.assets.features.code ?? false)}</li>
+                          <li>charts: {String(result?.assets.features.charts ?? false)}</li>
+                          <li>mermaid: {String(result?.assets.features.mermaid ?? false)}</li>
+                        </ul>
+                      </section>
+                    </div>
+                  </article>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="section muted-section">
+          <div className="container">
+            <div className="section-head">
+              <h2>API paths</h2>
+              <p>Pick the entrypoint for your runtime and depth.</p>
             </div>
             <div className="api-grid">
               <article className="api-card">
-                <h3>
-                  <code>renderMarkdownToHtml</code>
-                </h3>
-                <p>Use first when you only need sanitized HTML.</p>
+                <h3>featherdown</h3>
+                <p>Browser-safe <code>parse()</code> for apps and previews.</p>
+                <pre><code>{`import { Featherdown } from "featherdown";`}</code></pre>
               </article>
               <article className="api-card">
-                <h3>
-                  <code>renderMarkdown</code> and <code>renderMarkdownDocument</code>
-                </h3>
-                <p>
-                  Move here when you need diagnostics, toc, headings, excerpt, and
-                  reading stats from the same input.
-                </p>
+                <h3>featherdown/node</h3>
+                <p><code>parseFile()</code> and build-time Mermaid SVG rendering.</p>
+                <pre><code>{`import { Featherdown } from "featherdown/node";`}</code></pre>
               </article>
               <article className="api-card">
-                <h3>
-                  <code>createMarkdownProcessor</code> and plugin exports
-                </h3>
-                <p>
-                  Compose lower-level pipelines when you need custom transforms around
-                  featherdown defaults.
-                </p>
+                <h3>featherdown/advanced</h3>
+                <p>Direct unified processor and plugin access.</p>
+                <pre><code>{`import { createMarkdownProcessor } from "featherdown/advanced";`}</code></pre>
+              </article>
+              <article className="api-card">
+                <h3>Legacy helpers</h3>
+                <p>Compatibility exports for older integrations.</p>
+                <pre><code>{`import { renderMarkdown } from "featherdown";`}</code></pre>
               </article>
             </div>
-            <aside className="boundary-note">
-              <h3>Mermaid runtime boundary</h3>
+            <article className="boundary-note">
+              <h3>Client-side Mermaid previews</h3>
               <p>
-                Mermaid rendering is intentionally excluded from the default browser-safe
-                entry. Use <code>renderMarkdownToHtmlWithMermaid</code> from{" "}
-                <code>featherdown/node</code> in Node publishing pipelines.
+                The browser-safe <code>featherdown</code> entry does not bundle Mermaid. For live previews, parse Markdown first, then hydrate{" "}
+                <code>code.language-mermaid</code> blocks in your app with the <code>mermaid</code> package. The demo uses this client-side
+                approach. For build-time SVG output, use <code>featherdown/node</code>.
               </p>
-            </aside>
+              <p><strong>Client-side Mermaid is app-level hydration, not part of the default Featherdown browser bundle.</strong></p>
+              <pre className="boundary-snippet"><code>{`import mermaid from "mermaid";
+
+const result = await featherdown.parse(markdown);
+
+mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
+
+for (const block of document.querySelectorAll("code.language-mermaid")) {
+  const source = block.textContent ?? "";
+  const { svg } = await mermaid.render(\`diagram-\${crypto.randomUUID()}\`, source);
+
+  block.closest("pre")?.replaceWith(
+    Object.assign(document.createElement("div"), {
+      innerHTML: svg,
+    }),
+  );
+}`}</code></pre>
+            </article>
           </div>
         </section>
       </main>
@@ -543,18 +1129,9 @@ export default function App() {
           <p className="footer-version">featherdown v{__FEATHERDOWN_VERSION__}</p>
           <p className="footer-note">Browser-safe rendering for publishable markdown surfaces.</p>
           <nav>
-            <a href={githubUrl} target="_blank" rel="noreferrer">
-              GitHub
-            </a>
-            <a href={npmUrl} target="_blank" rel="noreferrer">
-              npm
-            </a>
-            <a href={jsrUrl} target="_blank" rel="noreferrer">
-              JSR
-            </a>
-            <a href="https://github.com/karuifeather/featherdown/blob/main/LICENSE">
-              License
-            </a>
+            <a href={githubUrl} target="_blank" rel="noreferrer">GitHub</a>
+            <a href={npmUrl} target="_blank" rel="noreferrer">npm</a>
+            <a href="https://github.com/karuifeather/featherdown/blob/main/LICENSE">License</a>
           </nav>
         </div>
       </footer>

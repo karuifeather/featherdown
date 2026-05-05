@@ -3,9 +3,14 @@
   "version": "0.2.0",
   "description": "Markdown-to-HTML pipeline with sanitization, diagnostics, and optional Node Mermaid rendering.",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css",
+    "styles/**/*.css"
+  ],
   "files": [
-    "dist"
+    "dist",
+    "styles.css",
+    "styles"
   ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,6 +25,16 @@
       "import": "./dist/node.js",
       "default": "./dist/node.js"
     },
+    "./advanced": {
+      "types": "./dist/advanced.d.ts",
+      "import": "./dist/advanced.js",
+      "default": "./dist/advanced.js"
+    },
+    "./styles.css": "./styles.css",
+    "./styles/base.css": "./styles/base.css",
+    "./styles/katex.css": "./styles/katex.css",
+    "./styles/code.css": "./styles/code.css",
+    "./styles/highlight.css": "./styles/highlight.css",
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -72,6 +87,7 @@
   "devDependencies": {
     "@eslint/js": "^9.18.0",
     "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.19.17",
     "eslint": "^9.18.0",
     "playwright": "^1.59.1",
     "tsup": "^8.3.5",
@@ -81,7 +97,9 @@
   },
   "dependencies": {
     "hast-util-to-text": "^4.0.2",
+    "highlight.js": "^11.11.0",
     "js-yaml": "^4.1.1",
+    "katex": "^0.16.0",
     "lowlight": "^3.3.0",
     "rehype-autolink-headings": "^7.1.0",
     "rehype-highlight": "^7.0.2",

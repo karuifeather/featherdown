@@ -1,9 +1,7 @@
 import { toText } from 'hast-util-to-text';
 import { EXIT, visit } from 'unist-util-visit';
-import {
-  createMarkdownProcessorInternal,
-  type MarkdownProcessorFeatureGates,
-} from './createMarkdownProcessorInternal.js';
+import type { MarkdownProcessorFeatureGates } from './createMarkdownProcessorInternal.js';
+import { createMarkdownProcessorWithMermaidInternal } from './createMarkdownProcessorWithMermaidInternal.js';
 import { createDiagnosticCollector } from './diagnostics.js';
 import type {
   HeadingMetadata,
@@ -120,16 +118,15 @@ function estimateReadingMinutes(wordCount: number): number {
 }
 
 /**
- * Render markdown through the default browser-safe pipeline and derive
- * publishing metadata from the final processed document tree.
+ * Like {@link renderMarkdownDocumentInternal}, but uses the Mermaid inline-SVG pipeline.
  */
-export async function renderMarkdownDocumentInternal(
+export async function renderMarkdownDocumentWithMermaidInternal(
   markdown: string,
   options?: RenderMarkdownOptions,
   pipelineFeatures?: MarkdownProcessorFeatureGates,
 ): Promise<RenderMarkdownDocumentResult> {
   const collector = createDiagnosticCollector();
-  const processor = createMarkdownProcessorInternal({
+  const processor = createMarkdownProcessorWithMermaidInternal({
     ...options,
     emitDiagnostic: collector.emit,
     preserveHeadingCustomIdMarker: true,

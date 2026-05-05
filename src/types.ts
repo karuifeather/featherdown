@@ -137,3 +137,122 @@ export type RenderMarkdownDocumentResult = {
   estimatedReadingMinutes: number;
 };
 
+/**
+ * Math rendering intent for {@link Featherdown}.
+ */
+export type FeatherdownMathOptions = {
+  enabled?: boolean;
+};
+
+/**
+ * Code block pipeline intent for {@link Featherdown}.
+ *
+ * `lineNumbers` and `copyButton` are normalized for future global defaults; per-fence
+ * `showLineNumbers` / `showCopyButton` in Markdown are unchanged in this release.
+ */
+export type FeatherdownCodeOptions = {
+  enabled?: boolean;
+  highlighting?: boolean;
+  lineNumbers?: boolean;
+  copyButton?: boolean;
+};
+
+/**
+ * Heading-related metadata intent for {@link Featherdown}. Slug and anchor HTML
+ * are still produced by the pipeline when enabled here; `toc` controls returned
+ * table-of-contents metadata only in this slice.
+ */
+export type FeatherdownHeadingOptions = {
+  slugs?: boolean;
+  anchors?: boolean;
+  toc?: boolean;
+};
+
+/**
+ * Publishing metadata fields returned from {@link Featherdown.parse}.
+ */
+export type FeatherdownPublishingOptions = {
+  excerpt?: boolean;
+  wordCount?: boolean;
+  readingTime?: boolean;
+};
+
+/**
+ * Well-known document metadata derived from YAML front matter when present.
+ */
+export type FeatherdownMetadata = {
+  title?: string;
+  description?: string;
+  date?: string;
+  updated?: string;
+  status?: string;
+  tags?: string[];
+  author?: string;
+};
+
+/**
+ * Options for {@link Featherdown} construction: legacy manifest fields plus
+ * user-intent toggles.
+ */
+export type FeatherdownOptions = RenderMarkdownOptions & {
+  /**
+   * When `true` or `"auto"`, parse leading YAML front matter when present and
+   * render only the body. When `false` or omitted, pass the full string through.
+   */
+  frontmatter?: false | true | 'auto';
+  math?: boolean | FeatherdownMathOptions;
+  code?: boolean | FeatherdownCodeOptions;
+  sanitize?: boolean;
+  /**
+   * `false`: hide diagnostics on the result (`[]`). `true` and `"warn"`: collect
+   * diagnostics, never throw. `"strict"`: collect diagnostics; throw
+   * `FeatherdownDiagnosticsError` if any were produced.
+   */
+  diagnostics?: boolean | 'warn' | 'strict';
+  charts?: boolean;
+  headings?: boolean | FeatherdownHeadingOptions;
+  publishing?: boolean | FeatherdownPublishingOptions;
+};
+
+/**
+ * Per-call options for {@link Featherdown.parse}. Same shape as {@link FeatherdownOptions}.
+ */
+export type FeatherdownParseOptions = FeatherdownOptions;
+
+/**
+ * Stable public contract for {@link Featherdown.parse} output: rendered document
+ * fields plus `body`, placeholders, `stats`, and `assets`. `excerpt` is always
+ * `string | null` after publishing gates (may be `null` when excerpt is disabled
+ * or when the document has no suitable excerpt).
+ */
+export type FeatherdownResult = RenderMarkdownDocumentResult & {
+  excerpt: string | null;
+  /**
+   * Markdown body after front matter is removed when front matter parsing is enabled
+   * and a valid block exists; otherwise the full input string.
+   */
+  body: string;
+  /**
+   * Parsed YAML front matter object, or `{}` when absent or when parsing is disabled.
+   */
+  frontmatter: Record<string, unknown>;
+  /**
+   * Typed subset of front matter for common publishing fields.
+   */
+  metadata: FeatherdownMetadata;
+  stats: {
+    wordCount: number;
+    readingTimeMinutes: number;
+  };
+  assets: {
+    styles: string[];
+    scripts: string[];
+    features: {
+      math: boolean;
+      code: boolean;
+      charts: boolean;
+      mermaid: boolean;
+    };
+  };
+};
+

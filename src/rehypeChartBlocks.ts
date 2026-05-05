@@ -3,10 +3,11 @@ import type { Root } from 'hast';
 import rehypeChartBlocksInternal from './internal/rehypeChartBlocksInternal.js';
 
 /**
- * Rehype plugin entrypoint for chart code fence transformations.
- *
- * Exports a plugin that converts supported `chart-*` fenced JSON blocks into
+ * Advanced rehype plugin: converts supported `chart-*` fenced JSON blocks into
  * chart mount placeholders in the output HTML tree.
+ *
+ * Most users should use `Featherdown`, which includes this pipeline by default.
+ * Prefer importing from `featherdown/advanced` for direct rehype integration.
  */
 
 /**

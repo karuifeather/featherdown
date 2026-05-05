@@ -4,10 +4,11 @@ import type { RenderMarkdownOptions } from './types.js';
 import rehypeCdnImagesInternal from './internal/rehypeCdnImagesInternal.js';
 
 /**
- * Rehype plugin entrypoint for image class and CDN URL rewriting.
+ * Advanced rehype plugin: annotates images and can rewrite `src` using
+ * caller-provided manifest mappings.
  *
- * Exports plugin options and a plugin that annotates image nodes and can
- * rewrite local image sources with caller-provided manifest mappings.
+ * Most users should use `Featherdown`, which includes this pipeline by default.
+ * Prefer importing from `featherdown/advanced` for direct rehype integration.
  */
 
 /**

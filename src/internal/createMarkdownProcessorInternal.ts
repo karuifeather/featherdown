@@ -26,9 +26,19 @@ import { remarkCodeBlockTitles } from './remarkCodeBlockTitles.js';
 import type { DiagnosticEmitter } from './diagnostics.js';
 import { markdownSanitizeSchema } from './sanitizeSchema.js';
 
+/** Optional pipeline stages for {@link Featherdown}; omit for legacy all-on behavior. */
+export type MarkdownProcessorFeatureGates = {
+  math: boolean;
+  code: boolean;
+  codeHighlighting: boolean;
+  charts: boolean;
+  sanitize: boolean;
+};
+
 type InternalOptions = RenderMarkdownOptions & {
   emitDiagnostic?: DiagnosticEmitter;
   preserveHeadingCustomIdMarker?: boolean;
+  features?: MarkdownProcessorFeatureGates;
 };
 
 function rehypeStripHeadingCustomIdMarker() {
@@ -51,31 +61,53 @@ function rehypeStripHeadingCustomIdMarker() {
 export function createMarkdownProcessorInternal(
   options?: InternalOptions,
 ): Processor<MdastRoot, MdastRoot, HastRoot> {
-  const processor = unified()
-    .use(remarkParse)
-    .use(remarkGfm)
-    .use(remarkDirective)
-    .use(remarkMath)
-    .use(remarkHeadingIds)
-    .use(remarkCallouts)
-    .use(remarkCodeBlockTitles)
-    .use(remarkRehype, { allowDangerousHtml: true })
-    .use(rehypeRaw);
+  const gates: MarkdownProcessorFeatureGates = options?.features ?? {
+    math: true,
+    code: true,
+    codeHighlighting: true,
+    charts: true,
+    sanitize: true,
+  };
 
-  if (options?.emitDiagnostic) {
-    processor.use(rehypeChartBlocksInternal, { emitDiagnostic: options.emitDiagnostic });
-  } else {
-    processor.use(rehypeChartBlocksInternal);
+  const processor = unified().use(remarkParse).use(remarkGfm).use(remarkDirective);
+
+  if (gates.math) {
+    processor.use(remarkMath);
   }
 
-  processor
-    .use(rehypeCodeBlockTitles)
-    .use(rehypeKatex, { output: 'html' })
-    .use(rehypeSanitize, markdownSanitizeSchema)
-    .use(rehypeSlug)
-    .use(rehypeAutolinkHeadings, { behavior: 'wrap' })
-    .use(rehypeHighlight)
-    .use(rehypeCodeLineHighlights);
+  processor.use(remarkHeadingIds).use(remarkCallouts);
+
+  if (gates.code) {
+    processor.use(remarkCodeBlockTitles);
+  }
+
+  processor.use(remarkRehype, { allowDangerousHtml: true }).use(rehypeRaw);
+
+  if (gates.charts) {
+    if (options?.emitDiagnostic) {
+      processor.use(rehypeChartBlocksInternal, { emitDiagnostic: options.emitDiagnostic });
+    } else {
+      processor.use(rehypeChartBlocksInternal);
+    }
+  }
+
+  if (gates.code) {
+    processor.use(rehypeCodeBlockTitles);
+  }
+
+  if (gates.math) {
+    processor.use(rehypeKatex, { output: 'html' });
+  }
+
+  if (gates.sanitize) {
+    processor.use(rehypeSanitize, markdownSanitizeSchema);
+  }
+
+  processor.use(rehypeSlug).use(rehypeAutolinkHeadings, { behavior: 'wrap' });
+
+  if (gates.code && gates.codeHighlighting) {
+    processor.use(rehypeHighlight).use(rehypeCodeLineHighlights);
+  }
 
   if (!options?.preserveHeadingCustomIdMarker) {
     processor.use(rehypeStripHeadingCustomIdMarker);
@@ -83,6 +115,5 @@ export function createMarkdownProcessorInternal(
 
   processor.use(rehypeCdnImagesInternal, options).use(rehypeStringify);
 
-  return processor;
+  return processor as unknown as Processor<MdastRoot, MdastRoot, HastRoot>;
 }
-

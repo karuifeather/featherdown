@@ -4,6 +4,9 @@ import type { RenderMarkdownOptions } from './types.js';
 /**
  * Node-only Mermaid rendering entrypoint.
  *
+ * @deprecated Prefer `new Featherdown({ mermaid: { render: "svg" } }).parse(markdown)` from `featherdown/node`.
+ * This helper remains available for compatibility.
+ *
  * Renders Markdown to sanitized HTML with Mermaid diagrams expanded to inline
  * SVG using the Node publishing pipeline. If an individual Mermaid block fails
  * to render, that block is preserved as a normal code fence while the rest of
@@ -18,8 +21,15 @@ export async function renderMarkdownToHtmlWithMermaid(
   return String(file);
 }
 
+export { Featherdown } from './nodeFeatherdown.js';
+export { FeatherdownDiagnosticsError } from './featherdownDiagnosticsError.js';
+export type {
+  NodeFeatherdownMermaidOptions,
+  NodeFeatherdownOptions,
+  NodeFeatherdownParseOptions,
+} from './nodeTypes.js';
+
 /**
  * Shared rendering options used by the Node Mermaid entrypoint.
  */
 export type { RenderMarkdownOptions } from './types.js';
-

@@ -1,6 +1,6 @@
 {
   "name": "featherdown",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Markdown-to-HTML pipeline with sanitization, diagnostics, and optional Node Mermaid rendering.",
   "type": "module",
   "sideEffects": [

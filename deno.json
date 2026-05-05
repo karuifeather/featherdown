@@ -1,6 +1,6 @@
 {
   "name": "@karuifeather/featherdown",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "unstable": ["sloppy-imports"],
   "imports": {
     "hast": "npm:@types/hast@^3.0.4",

@@ -1,13 +1,17 @@
 {
   "name": "@karuifeather/featherdown",
   "version": "0.3.0",
-  "unstable": ["sloppy-imports"],
+  "unstable": [
+    "sloppy-imports"
+  ],
   "imports": {
     "hast": "npm:@types/hast@^3.0.4",
     "mdast": "npm:@types/mdast@^4.0.4"
   },
   "exports": {
     ".": "./src/index.ts",
+    "./node": "./src/node.ts",
+    "./advanced": "./src/advanced.ts",
     "./parseMarkdownFile": "./src/parseMarkdownFile.ts",
     "./createMarkdownProcessor": "./src/createMarkdownProcessor.ts",
     "./rehypeChartBlocks": "./src/rehypeChartBlocks.ts",
@@ -25,7 +29,14 @@
       "node_modules/",
       "test/",
       ".gitignore",
-      "package-lock.json"
+      "package-lock.json",
+      "site/",
+      "scripts/",
+      "npm-smoke-test/",
+      "eslint.config.js",
+      "tsup.config.ts",
+      "vitest.config.ts",
+      "RELEASING.md"
     ]
   }
 }

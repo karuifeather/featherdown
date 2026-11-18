@@ -47,6 +47,7 @@ The default npm entry is **browser-safe**. Optional **Node-only** Mermaid (inlin
 - [Advanced and compatibility APIs](#advanced-and-compatibility-apis)
 - [Migration from legacy helpers](#migration-from-legacy-helpers)
 - [Public API summary](#public-api-summary)
+- [Stability and versioning](#stability-and-versioning)
 - [Scripts](#scripts), [Site](#site), [Maintainers](#maintainers)
 
 ## Install
@@ -183,7 +184,7 @@ Behaviors that surprise people. Each one is intentional, but easy to trip on.
 **Versions and imports**
 
 - **The legacy helpers are not `Featherdown`.** `renderMarkdownToHtml` and friends take the older `RenderMarkdownOptions` and get none of the newer features. See [Migration](#migration-from-legacy-helpers).
-- **Root re-exports of legacy and advanced symbols are deprecated.** Import from `featherdown/legacy` and `featherdown/advanced`.
+- **The root exports only `Featherdown`, `FeatherdownDiagnosticsError`, `libraryId`, and types.** Legacy helpers live on `featherdown/legacy` and the processor and rehype plugins on `featherdown/advanced`.
 - **JSR has no CSS subpaths.** Use npm (or a bundler) for `featherdown/styles.css`.
 
 Fixes and behavior changes by release are in [CHANGELOG.md](./CHANGELOG.md); the **Changed** entries marked **Behavior** are the ones most likely to affect existing output.
@@ -760,7 +761,7 @@ const featherdown = new Featherdown({
 | **`featherdown`** | Browser-safe; no Mermaid / Playwright in the default bundle. |
 | **`featherdown/node`** | Node **`Featherdown`**, optional Mermaid SVG, **`parseFile`**. |
 | **`featherdown/advanced`** | Processor + rehype plugins for unified integrations. |
-| **`featherdown/legacy`** | Deprecated pre-`Featherdown` helper functions. |
+| **`featherdown/legacy`** | Pre-`Featherdown` helper functions (older `RenderMarkdownOptions` surface). |
 
 `featherdown/node` (including Mermaid) is also available from JSR as `@karuifeather/featherdown/node`; Mermaid still needs the Playwright / Chromium setup.
 
@@ -827,7 +828,7 @@ import {
 } from "featherdown/advanced";
 ```
 
-The same symbols are still re-exported from the **root** package, but those root re-exports are **deprecated** and will be removed in a future minor release—import them from **`featherdown/advanced`**.
+These symbols are not exported from the root package; import them from **`featherdown/advanced`**.
 
 ### Legacy function exports (`featherdown/legacy`)
 
@@ -837,7 +838,7 @@ Older helpers (`renderMarkdownToHtml`, `renderMarkdown`, `renderMarkdownDocument
 import { renderMarkdownToHtml } from "featherdown/legacy";
 ```
 
-They are still re-exported from the package root, marked **`@deprecated`**, for one more minor release; switch imports to **`featherdown/legacy`** (or migrate to **`Featherdown`**) before the root re-exports are removed. They take **`RenderMarkdownOptions`**, not the full **`FeatherdownOptions`** surface (for example **`math`**, **`code`**, **`charts`**, **`frontmatter`**, **`alerts`**, **`links`**, **`images`**, **`embeds`**, and **`diagnostics: "strict"`** are **`Featherdown`** features). Their output does not include these enhancements. Prefer **`new Featherdown().parse()`** for new code.
+They are no longer exported from the package root (before 1.0 the root re-exported them as deprecated); import them from **`featherdown/legacy`** or migrate to **`Featherdown`**. They take **`RenderMarkdownOptions`**, not the full **`FeatherdownOptions`** surface (for example **`math`**, **`code`**, **`charts`**, **`frontmatter`**, **`alerts`**, **`links`**, **`images`**, **`embeds`**, and **`diagnostics: "strict"`** are **`Featherdown`** features). Their output does not include these enhancements. Prefer **`new Featherdown().parse()`** for new code.
 
 ## Migration from legacy helpers
 
@@ -880,9 +881,30 @@ const { html } = await new Featherdown().parse(markdown);
 
 - `featherdown/styles.css`, `featherdown/styles/base.css`, `featherdown/styles/katex.css`, `featherdown/styles/code.css`, `featherdown/styles/highlight.css`
 
-**Compatibility (deprecated)**
+**Compatibility**
 
-- Legacy render helpers and **`parseMarkdownFile`** from **`featherdown/legacy`** (still re-exported from the root for now); **`renderMarkdownToHtmlWithMermaid`** on **`featherdown/node`**; **`featherdown/advanced`** for processor/plugins.
+- Legacy render helpers and **`parseMarkdownFile`** from **`featherdown/legacy`**; **`renderMarkdownToHtmlWithMermaid`** (deprecated) on **`featherdown/node`**; **`featherdown/advanced`** for processor/plugins.
+
+## Stability and versioning
+
+featherdown follows [semantic versioning](https://semver.org/) from 1.0.0.
+
+**Covered by semver** (a breaking change needs a new major version):
+
+- The package entry points: `featherdown`, `featherdown/node`, `featherdown/advanced`, `featherdown/legacy`, and the documented `featherdown/styles*.css` files.
+- The `Featherdown` class: option names, their defaults, and the shape of `FeatherdownResult`.
+- Diagnostic `code` and `source` values.
+- The class names and element structure listed under [HTML contracts](#html-contracts).
+
+**Not covered:**
+
+- Exact whitespace, and the markup produced by dependencies: KaTeX's and highlight.js's internal classes and structure, and Mermaid SVG.
+- Anything not exported or not documented here, including internal modules and the layout of `dist/`.
+- The wording of diagnostic `message` text.
+
+**Output can change in a minor release** when a new syntax is added and enabled by default, because it can change how existing documents render. Those changes are listed in [CHANGELOG.md](./CHANGELOG.md) under **Changed** with a **Behavior** label, and each one comes with an option to turn it off (for example `subSuperscript: false`). Pin an exact version if you need byte-identical output.
+
+Deprecated APIs stay for at least one minor release before removal, and removals happen only in a major release.
 
 ## Scripts
 

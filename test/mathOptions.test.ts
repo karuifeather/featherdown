@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Featherdown, FeatherdownDiagnosticsError, renderMarkdownDocument } from '../src/index.js';
+import { Featherdown, FeatherdownDiagnosticsError } from '../src/index.js';
+import { renderMarkdownDocument } from '../src/legacy.js';
 
 describe('math.macros', () => {
   it('expands configured macros', async () => {

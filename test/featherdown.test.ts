@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Featherdown, FeatherdownDiagnosticsError, renderMarkdownDocument } from '../src/index.js';
+import { Featherdown, FeatherdownDiagnosticsError } from '../src/index.js';
+import { renderMarkdownDocument } from '../src/legacy.js';
 import type { FeatherdownMetadata } from '../src/types.js';
 
 const richMarkdown = ['# Title', '', 'Inline $x^2$ math.', '', '```ts', 'const x = 1;', '```', '', '```chart-line', '{"labels":["a"],"datasets":[]}', '```', ''].join('\n');

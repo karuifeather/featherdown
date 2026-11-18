@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Featherdown, renderMarkdownDocument } from '../src/index.js';
+import { Featherdown } from '../src/index.js';
+import { renderMarkdownDocument } from '../src/legacy.js';
 
 const fd = new Featherdown();
 const html = async (md: string, options?: ConstructorParameters<typeof Featherdown>[0]) =>

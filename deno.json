@@ -12,14 +12,7 @@
     ".": "./src/index.ts",
     "./node": "./src/node.ts",
     "./advanced": "./src/advanced.ts",
-    "./legacy": "./src/legacy.ts",
-    "./parseMarkdownFile": "./src/parseMarkdownFile.ts",
-    "./createMarkdownProcessor": "./src/createMarkdownProcessor.ts",
-    "./rehypeChartBlocks": "./src/rehypeChartBlocks.ts",
-    "./rehypeCdnImages": "./src/rehypeCdnImages.ts",
-    "./renderMarkdown": "./src/renderMarkdown.ts",
-    "./renderMarkdownToHtml": "./src/renderMarkdownToHtml.ts",
-    "./libraryId": "./src/libraryId.ts"
+    "./legacy": "./src/legacy.ts"
   },
   "publish": {
     "exclude": [

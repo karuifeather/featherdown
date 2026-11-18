@@ -5,8 +5,7 @@
  * or rehype workflows. Most applications should use the `Featherdown` class from
  * `featherdown` instead.
  *
- * The same symbols remain re-exported from the package root for compatibility;
- * this path makes advanced integrations explicit in imports.
+ * These symbols are not exported from the package root.
  */
 export { createMarkdownProcessor } from './createMarkdownProcessor.js';
 export { rehypeChartBlocks } from './rehypeChartBlocks.js';

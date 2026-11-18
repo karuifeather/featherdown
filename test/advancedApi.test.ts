@@ -6,7 +6,7 @@ import rehypeStringify from 'rehype-stringify';
 import { createMarkdownProcessor } from '../src/createMarkdownProcessor.js';
 import { rehypeChartBlocks } from '../src/rehypeChartBlocks.js';
 import { rehypeCdnImages } from '../src/rehypeCdnImages.js';
-import { renderMarkdown, renderMarkdownToHtml } from '../src/index.js';
+import { renderMarkdown, renderMarkdownToHtml } from '../src/legacy.js';
 
 describe('advanced API', () => {
   it('createMarkdownProcessor output matches renderMarkdownToHtml', async () => {

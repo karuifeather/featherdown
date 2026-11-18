@@ -2,9 +2,9 @@
  * Legacy compatibility entry: the pre-`Featherdown` helper functions.
  *
  * New code should use `new Featherdown().parse(markdown)` from `featherdown`.
- * These helpers are also still re-exported (deprecated) from the package root
- * for one more minor release; import them from `featherdown/legacy` to keep
- * working after the root re-exports are removed.
+ * These helpers take the older `RenderMarkdownOptions` and do not get newer
+ * features (math options, tabs, alerts, ...). They are supported at this path
+ * and are no longer exported from the package root.
  */
 export { renderMarkdown } from './renderMarkdown.js';
 export { renderMarkdownDocument } from './renderMarkdownDocument.js';

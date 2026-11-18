@@ -3,7 +3,7 @@ import {
   renderMarkdown,
   renderMarkdownDocument,
   renderMarkdownToHtml,
-} from '../src/index.js';
+} from '../src/legacy.js';
 
 describe('renderMarkdownDocument', () => {
   it('returns html and document metadata for a normal document', async () => {

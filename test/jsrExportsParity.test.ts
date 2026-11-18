@@ -32,4 +32,8 @@ describe('JSR / npm export parity', () => {
       expect(deno[subpath], `deno.json exports["${subpath}"]`).toBe(source);
     }
   });
+
+  it('exposes nothing on JSR that npm does not (no hidden public API)', () => {
+    expect(Object.keys(deno)).toEqual(['.', './node', './advanced', './legacy']);
+  });
 });

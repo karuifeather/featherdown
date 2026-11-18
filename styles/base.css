@@ -325,3 +325,78 @@
   height: 100%;
   border: 0;
 }
+
+/* ---- Tabs (::::tabs) ----
+   Markup is semantic only. Until the host marks a group `data-tabs-ready`
+   (see the README), every panel is shown under its label and the tab list is
+   hidden, so the content reads correctly without JavaScript. */
+.featherdown-content .tabs {
+  margin: 1rem 0;
+  border: 1px solid var(--fd-color-border);
+  border-radius: 0.4rem;
+}
+
+.featherdown-content .tabs-list {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem 0.25rem 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--fd-color-border);
+  background: var(--fd-color-subtle);
+  border-radius: 0.4rem 0.4rem 0 0;
+}
+
+.featherdown-content .tabs-tab {
+  margin: 0 0 -1px;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 0.3rem 0.3rem 0 0;
+  background: transparent;
+  color: var(--fd-color-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.featherdown-content .tabs-tab[aria-selected="true"] {
+  border-color: var(--fd-color-border);
+  background: var(--fd-color-surface);
+  color: var(--fd-color-heading);
+}
+
+.featherdown-content .tab-panel {
+  padding: 0.5rem 1rem;
+}
+
+.featherdown-content .tab-panel[hidden] {
+  display: none;
+}
+
+.featherdown-content .tabs:not([data-tabs-ready]) > .tabs-list {
+  display: none;
+}
+
+.featherdown-content .tabs:not([data-tabs-ready]) > .tab-panel::before {
+  content: attr(data-tab-label);
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+  color: var(--fd-color-heading);
+}
+
+/* ---- Definition lists ---- */
+.featherdown-content dl {
+  margin: 1rem 0;
+}
+
+.featherdown-content dt {
+  margin-top: 0.75rem;
+  font-weight: 600;
+  color: var(--fd-color-heading);
+}
+
+.featherdown-content dd {
+  margin: 0.25rem 0 0 1.5rem;
+}

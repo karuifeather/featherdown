@@ -49,6 +49,9 @@ export type ResolvedFeatherdownOptions = {
   };
   alerts: boolean;
   details: boolean;
+  subSuperscript: boolean;
+  definitionLists: boolean;
+  tabs: boolean;
   links: {
     enabled: boolean;
     rel: string | false;
@@ -409,6 +412,9 @@ export function resolveFeatherdownOptions(raw?: FeatherdownOptions): ResolvedFea
     frontmatter: normalizeFrontmatter(mergedNested.frontmatter),
     alerts: mergedNested.alerts ?? true,
     details: mergedNested.details ?? true,
+    subSuperscript: mergedNested.subSuperscript ?? true,
+    definitionLists: mergedNested.definitionLists ?? true,
+    tabs: mergedNested.tabs ?? true,
     links: normalizeLinks(mergedNested.links),
     images: normalizeImages(mergedNested.images),
     embeds: normalizeEmbeds(mergedNested.embeds),

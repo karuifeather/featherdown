@@ -323,6 +323,20 @@ export type FeatherdownOptions = RenderMarkdownOptions & {
   alerts?: boolean;
   /** `:::details[Summary]` collapsible sections. Default `true`. */
   details?: boolean;
+  /**
+   * `H~2~O` and `x^2^` render as `<sub>` and `<sup>`. Content between the marks
+   * cannot contain whitespace. Because `~x~` now means subscript, only the
+   * double-tilde `~~x~~` form is strikethrough. Default `true`.
+   */
+  subSuperscript?: boolean;
+  /** `Term` followed by `: Definition` lines render as `<dl>`. Default `true`. */
+  definitionLists?: boolean;
+  /**
+   * `::::tabs` containing `:::tab[Label]` panels. Output is semantic markup
+   * (tablist, tabs, panels) with no behavior; see the README for wiring it up.
+   * Default `true`.
+   */
+  tabs?: boolean;
   /** External link `rel` / `target`. Default `false` (opt in). */
   links?: boolean | FeatherdownLinkOptions;
   /** Lazy loading, decoding and figure captions. Default `false` (opt in). */
@@ -374,6 +388,7 @@ export type FeatherdownResult = RenderMarkdownDocumentResult & {
       charts: boolean;
       mermaid: boolean;
       embeds: boolean;
+      tabs: boolean;
     };
   };
 };

@@ -28,6 +28,7 @@ const baseH3 = baseAttrs.h3 ?? [];
 const baseH4 = baseAttrs.h4 ?? [];
 const baseH5 = baseAttrs.h5 ?? [];
 const baseH6 = baseAttrs.h6 ?? [];
+const tabsClassNames = ['tabs', 'tab-panel'];
 const calloutClassNames = [
   'callout',
   ...CALLOUT_TYPES.map((type) => `callout-${type}`),
@@ -52,7 +53,8 @@ export const markdownSanitizeSchema: Schema = {
     h4: [...baseH4, 'dataHeadingCustomId'],
     h5: [...baseH5, 'dataHeadingCustomId'],
     h6: [...baseH6, 'dataHeadingCustomId'],
-    div: [...baseDiv, ['className', ...calloutClassNames]],
+    // `div.tabs > div.tab-panel[data-tab-label]` comes from `::::tabs`; buttons are added after sanitize.
+    div: [...baseDiv, ['className', ...calloutClassNames, ...tabsClassNames], 'dataTabLabel'],
     // `:::details` output; `open` is already allowed globally by defaultSchema.
     details: [...(baseAttrs.details ?? []), ['className', 'details']],
   },

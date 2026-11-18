@@ -210,8 +210,16 @@ assert.ok(
   'code.css must not import highlight.js; that belongs in highlight.css.',
 );
 assert.ok(
-  highlightCss.includes('highlight.js/styles/github.min.css'),
-  'highlight.css should import the default highlight.js theme.',
+  highlightCss.includes('.hljs-keyword') && highlightCss.includes('--fd-hl-keyword'),
+  'highlight.css should ship the default token theme.',
+);
+assert.ok(
+  highlightCss.includes('[data-theme="dark"]') && highlightCss.includes('prefers-color-scheme: dark'),
+  'highlight.css should ship a dark palette that follows base.css theme switching.',
+);
+assert.ok(
+  !highlightCss.includes('background: #') && !/padding\s*:/.test(highlightCss),
+  'highlight.css must be colors only: no block background or padding (code.css owns those).',
 );
 
 const packOutput = execSync('npm pack --dry-run 2>&1', {

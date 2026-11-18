@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Dark mode: `highlight.css` is now an owned GitHub-palette theme with a dark variant (`--fd-hl-*` variables) instead of importing highlight.js's light-only GitHub theme, which made token colors hard to read and painted white boxes behind fences without a title. Bare fenced code blocks are now styled by `code.css`.
+- Code lines no longer lose the space between adjacent tokens (`const s` rendered as `consts`); `.code-line` is `inline-block` instead of `inline-flex`.
+- Callouts and `:::details` no longer add extra space after their last child or between the callout title and body.
+- `code.css` no longer stacks highlight.js's `pre code.hljs { padding: 1em }` on top of the code block's own padding, which left uneven extra space inside fenced code blocks.
+
 ## [0.5.0] - 2026-11-18
 
 ### Fixed

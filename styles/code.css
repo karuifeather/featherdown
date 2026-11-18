@@ -2,6 +2,27 @@
  * Featherdown-owned fenced code block chrome (titles, copy shell, line layout).
  * Syntax highlighting colors live in `highlight.css`.
  */
+/* Fences without chrome (no title, line numbers, etc.) render a bare <pre><code>. */
+.featherdown-content pre {
+  /* Size and line-height live on the pre so its line boxes match the code text. */
+  font-family: var(--fd-font-mono);
+  font-size: 85%;
+  line-height: 1.5;
+  padding: 0.85rem 0.95rem;
+  overflow-x: auto;
+  border: 1px solid var(--fd-color-border);
+  border-radius: 0.4rem;
+  background: var(--fd-color-code-bg);
+}
+
+.featherdown-content pre code {
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0;
+  color: var(--fd-color-code-text);
+  background: transparent;
+}
+
 .featherdown-content .code-block {
   margin: 1rem 0;
   border: 1px solid var(--fd-color-border);
@@ -23,14 +44,19 @@
   margin: 0;
   padding: 0.85rem 0.95rem;
   overflow-x: auto;
+  border: 0;
+  border-radius: 0;
   background: var(--fd-color-code-bg);
 }
 
 .featherdown-content .code-block code {
-  font-family: var(--fd-font-mono);
+  font-family: inherit;
   color: var(--fd-color-code-text);
   background: transparent;
-  font-size: 85%;
+  font-size: inherit;
+  /* The pre owns the block padding. stock hljs themes ship `pre code.hljs { padding: 1em }`,
+     which would stack on top of it. */
+  padding: 0;
 }
 
 .featherdown-content .code-block-copyable {
@@ -55,8 +81,10 @@
   filter: brightness(0.96);
 }
 
+/* inline-block (not flex): flex containers drop whitespace-only text between child spans,
+   which would glue tokens together (`const s` -> `consts`). */
 .featherdown-content .code-line {
-  display: inline-flex;
+  display: inline-block;
   width: 100%;
 }
 
@@ -65,7 +93,8 @@
 }
 
 .featherdown-content .code-line-numbered .code-line-number {
-  flex: 0 0 2.8ch;
+  display: inline-block;
+  width: 2.8ch;
   margin-right: 0.8ch;
   text-align: right;
   color: var(--fd-color-muted);
@@ -89,4 +118,10 @@
 .featherdown-content .code-line-numbered .code-line-removed .code-line-number::after {
   content: '-';
   margin-left: 0.4ch;
+}
+
+/* The line tint above carries diff styling; drop the theme's text-width box on top of it. */
+.featherdown-content .code-line-added .hljs-addition,
+.featherdown-content .code-line-removed .hljs-deletion {
+  background: transparent;
 }

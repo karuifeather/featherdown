@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-18
+
+### Documentation
+
+- README restructured for learning: defaults table, gotchas, diagnostics reference.
+
 ### Fixed
 
 - Dark mode: `highlight.css` is now an owned GitHub-palette theme with a dark variant (`--fd-hl-*` variables) instead of importing highlight.js's light-only GitHub theme, which made token colors hard to read and painted white boxes behind fences without a title. Bare fenced code blocks are now styled by `code.css`.

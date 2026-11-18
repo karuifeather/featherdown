@@ -22,6 +22,8 @@ const sampleDocument = (): RenderMarkdownDocumentResult => ({
   estimatedReadingMinutes: 1,
 });
 
+const allDetected = { math: true, code: true, charts: true, embeds: true, mermaid: true };
+
 describe('buildFeatherdownResult', () => {
   it('zeros publishing fields when publishing is fully disabled', () => {
     const resolved = resolveFeatherdownOptions({ publishing: false });
@@ -72,6 +74,7 @@ describe('buildFeatherdownResult', () => {
       metadata: {},
       document: sampleDocument(),
       options: resolved,
+      detected: allDetected,
     });
     expect(result.assets.styles).toEqual([
       'featherdown/styles/base.css',
@@ -89,6 +92,7 @@ describe('buildFeatherdownResult', () => {
       metadata: {},
       document: sampleDocument(),
       options: resolved,
+      detected: allDetected,
     });
     expect(result.assets.styles).toEqual([
       'featherdown/styles/base.css',
@@ -105,6 +109,7 @@ describe('buildFeatherdownResult', () => {
       metadata: {},
       document: sampleDocument(),
       options: resolved,
+      detected: allDetected,
     });
     expect(result.assets.styles).toEqual(['featherdown/styles/base.css', 'featherdown/styles/katex.css']);
   });
@@ -119,6 +124,7 @@ describe('buildFeatherdownResult', () => {
       metadata: {},
       document: sampleDocument(),
       options: resolved,
+      detected: allDetected,
     });
     expect(result.assets.styles).toEqual([
       'featherdown/styles/base.css',
@@ -135,6 +141,7 @@ describe('buildFeatherdownResult', () => {
       metadata: {},
       document: sampleDocument(),
       options: resolved,
+      detected: allDetected,
       mermaidFeature: true,
     });
     expect(result.assets.features.mermaid).toBe(true);

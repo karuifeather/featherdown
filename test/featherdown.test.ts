@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { Featherdown, FeatherdownDiagnosticsError, renderMarkdownDocument } from '../src/index.js';
 import type { FeatherdownMetadata } from '../src/types.js';
 
+const richMarkdown = ['# Title', '', 'Inline $x^2$ math.', '', '```ts', 'const x = 1;', '```', '', '```chart-line', '{"labels":["a"],"datasets":[]}', '```', ''].join('\n');
+
 describe('Featherdown', () => {
   it('parses basic markdown with expected html and diagnostics', async () => {
     const featherdown = new Featherdown();
@@ -13,7 +15,7 @@ describe('Featherdown', () => {
   });
 
   it('returns the extended FeatherdownResult shape with placeholder fields', async () => {
-    const originalMarkdown = '# Title\n\nBody text.\n';
+    const originalMarkdown = richMarkdown;
     const featherdown = new Featherdown();
     const result = await featherdown.parse(originalMarkdown);
 
@@ -71,7 +73,7 @@ describe('Featherdown', () => {
         readingTime: true,
       },
     });
-    const result = await featherdown.parse('# Hello\n');
+    const result = await featherdown.parse('# Hello\n\n$x$\n');
     expect(result.html).toContain('Hello');
     expect(result.assets.features.math).toBe(true);
   });
@@ -83,7 +85,7 @@ describe('Featherdown', () => {
         lineNumbers: false,
       },
     });
-    const result = await featherdown.parse('# Hi\n', {
+    const result = await featherdown.parse(richMarkdown, {
       math: false,
       code: {
         lineNumbers: true,
@@ -177,7 +179,7 @@ describe('Featherdown', () => {
   });
 
   it('omits katex.css from assets.styles when math is disabled', async () => {
-    const result = await new Featherdown().parse('# Hello', { math: false });
+    const result = await new Featherdown().parse(richMarkdown, { math: false });
     expect(result.assets.styles).toContain('featherdown/styles/base.css');
     expect(result.assets.styles).not.toContain('featherdown/styles/katex.css');
     expect(result.assets.styles).toContain('featherdown/styles/code.css');
@@ -185,7 +187,7 @@ describe('Featherdown', () => {
   });
 
   it('omits code.css and highlight.css from assets.styles when code is disabled', async () => {
-    const result = await new Featherdown().parse('# Hello', { code: false });
+    const result = await new Featherdown().parse(richMarkdown, { code: false });
     expect(result.assets.styles).toContain('featherdown/styles/base.css');
     expect(result.assets.styles).toContain('featherdown/styles/katex.css');
     expect(result.assets.styles).not.toContain('featherdown/styles/code.css');
@@ -193,7 +195,7 @@ describe('Featherdown', () => {
   });
 
   it('omits highlight.css when code is enabled but syntax highlighting is off', async () => {
-    const result = await new Featherdown().parse('# Hello', {
+    const result = await new Featherdown().parse(richMarkdown, {
       code: { enabled: true, highlighting: false },
     });
     expect(result.assets.styles).toContain('featherdown/styles/base.css');
@@ -366,10 +368,17 @@ describe('Featherdown front matter', () => {
     expect(result.body).toBe(md);
   });
 
-  it('keeps malformed tags on frontmatter but omits tags from metadata', async () => {
+  it('accepts a single string tag as one tag', async () => {
     const md = ['---', 'tags: "markdown"', '---', '# Hi', ''].join('\n');
     const result = await new Featherdown({ frontmatter: 'auto' }).parse(md);
     expect(result.frontmatter.tags).toBe('markdown');
+    expect(result.metadata.tags).toEqual(['markdown']);
+  });
+
+  it('omits malformed tag arrays from metadata but keeps them on frontmatter', async () => {
+    const md = ['---', 'tags: [a, 1]', '---', '# Hi', ''].join('\n');
+    const result = await new Featherdown({ frontmatter: 'auto' }).parse(md);
+    expect(result.frontmatter.tags).toEqual(['a', 1]);
     expect(result.metadata.tags).toBeUndefined();
   });
 

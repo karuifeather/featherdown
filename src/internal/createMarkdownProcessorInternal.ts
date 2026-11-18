@@ -199,11 +199,6 @@ export function createMarkdownProcessorInternal(options?: InternalProcessorOptio
     processor.use(rehypeEmbeds);
   }
 
-  // After sanitize: tab buttons and generated ids are trusted output, not author input.
-  if (gates.tabs) {
-    processor.use(rehypeTabs);
-  }
-
   // Before rehype-slug / autolink so heading anchors use the deduped id.
   if (gates.sanitize) {
     processor.use(rehypeDedupeFootnoteIds);
@@ -234,6 +229,12 @@ export function createMarkdownProcessorInternal(options?: InternalProcessorOptio
   }
 
   processor.use(rehypeSlug).use(rehypeAutolinkHeadings, { behavior: 'wrap' });
+
+  // After sanitize (buttons and generated ids are trusted output, not author input) and after
+  // rehype-slug, so generated tab ids can avoid every id already in the document.
+  if (gates.tabs) {
+    processor.use(rehypeTabs);
+  }
 
   if (gates.code && gates.codeHighlighting) {
     processor.use(rehypeHighlight);

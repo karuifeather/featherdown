@@ -78,6 +78,25 @@ describe('math.trust', () => {
     expect(r.diagnostics.map((d) => d.code)).toEqual(['math.trust', 'math.trust']);
   });
 
+  it('reports a blocked command once even when the equation also fails to parse', async () => {
+    // The parse error comes after \href, so KaTeX asks about trust, fails, then asks again in
+    // rehype-katex's fallback render.
+    const r = await new Featherdown().parse('$\\href{https://example.com}{x} \\frac{1$');
+    expect(r.diagnostics.map((d) => d.code)).toEqual(['math.trust', 'math.render']);
+  });
+
+  it('still reports blocked commands separately for separate equations', async () => {
+    const r = await new Featherdown().parse(
+      '$\\href{https://a.example}{x} \\frac{1$\n\n$\\href{https://a.example}{x} \\frac{1$\n\n$\\href{https://a.example}{x}$',
+    );
+    // One math.trust per equation (3), one math.render per broken equation (2). Render errors
+    // are collected after the pass, so they follow the trust diagnostics.
+    const codes = r.diagnostics.map((d) => d.code);
+    expect(codes.filter((c) => c === 'math.trust')).toHaveLength(3);
+    expect(codes.filter((c) => c === 'math.render')).toHaveLength(2);
+    expect(codes).toHaveLength(5);
+  });
+
   it('allows HTML-extension commands when trust is true', async () => {
     const r = await new Featherdown({ math: { trust: true } }).parse('$\\htmlClass{hl}{x}$');
     expect(r.html).toContain('enclosing hl');

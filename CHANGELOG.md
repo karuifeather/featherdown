@@ -28,12 +28,13 @@ First stable release. From here the public API follows semantic versioning; see 
 
 ### Changed
 
+- **Behavior:** `plugins.remark` no longer sees inline (`:name`) directive nodes. They are turned back into the text they were written as before user plugins run (see **Fixed** below), so a remark plugin cannot define its own inline directives. Container directives Featherdown does not handle were already plain text at that point; unhandled leaf directives are unchanged.
 - **Behavior:** with `subSuperscript` on (the default), single-tilde `~x~` is subscript instead of GFM strikethrough. `~~x~~` still strikes through. Set `subSuperscript: false` for the old behavior.
 - **Behavior:** KaTeX `strict` no longer logs to the console. Strictness warnings were silenced by default (`"ignore"`); use `math: { strict: "warn" }` to get them as diagnostics.
 
 ### Fixed
 
-- Text such as `10:30` or `:smile:` no longer loses characters. remark-directive read `:30` as an inline directive, which rendered as an empty element. Inline directives are now restored to the text they were written as (this also applies to the legacy helpers).
+- Text such as `10:30` or `:smile:` no longer loses characters. remark-directive read `:30` as an inline directive, which rendered as an empty element. Inline directives are now restored to the text they were written as (this also applies to the legacy helpers). Text that only looked like a directive and used to vanish silently, for example a pasted `:chatgpt-content-reference{index="0"}` marker, now appears as written; remove such leftovers from your content.
 
 ## [0.5.1] - 2026-11-18
 

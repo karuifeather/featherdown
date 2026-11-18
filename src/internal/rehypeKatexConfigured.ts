@@ -43,15 +43,26 @@ export default function rehypeKatexConfigured() {
 
     // KaTeX does not throw for a command that trust blocks; it renders the command name in the
     // error color. Reporting each blocked command tells authors why their `\href` did nothing.
+    //
+    // When an equation both uses a blocked command and fails to parse, rehype-katex renders it a
+    // second time as a fallback and KaTeX asks about the same command again. That repeat is the
+    // only case where a render error was logged between two identical questions, so skip it.
+    let lastBlocked: { key: string; messages: number } | undefined;
     const trust = math.trust
       ? true
-      : (blocked: { command: string }): false => {
-          emit?.({
-            code: 'math.trust',
-            message: `Blocked ${blocked.command} in math: KaTeX HTML-extension commands need math.trust.`,
-            severity: 'warning',
-            source: 'math',
-          });
+      : (blocked: { command: string; url?: string }): false => {
+          const key = `${blocked.command}|${blocked.url ?? ''}`;
+          const messages = file.messages.length;
+          const isFallbackRepeat = lastBlocked?.key === key && messages > lastBlocked.messages;
+          lastBlocked = { key, messages };
+          if (!isFallbackRepeat) {
+            emit?.({
+              code: 'math.trust',
+              message: `Blocked ${blocked.command} in math: KaTeX HTML-extension commands need math.trust.`,
+              severity: 'warning',
+              source: 'math',
+            });
+          }
           return false;
         };
 

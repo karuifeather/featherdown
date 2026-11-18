@@ -54,6 +54,27 @@ describe('subSuperscript', () => {
     expect(out).not.toContain('<sup>1</sup>');
   });
 
+  it('never changes link text that is the link URL itself', async () => {
+    const out = await html(
+      [
+        '<https://example.com/a~b~c>',
+        '[https://x.com/a~b~c](https://x.com/a~b~c)',
+        'www.example.com/a~b~c',
+        '<me^a^b@example.com>',
+      ].join('\n\n'),
+    );
+    expect(out).toContain('>https://example.com/a~b~c</a>');
+    expect(out).toContain('>https://x.com/a~b~c</a>');
+    expect(out).toContain('>www.example.com/a~b~c</a>');
+    expect(out).toContain('>me^a^b@example.com</a>');
+    expect(out).not.toContain('<sub>');
+    expect(out).not.toContain('<sup>');
+  });
+
+  it('still converts link text that differs from the URL', async () => {
+    expect(await html('[H~2~O](https://example.com/a~b~c)')).toContain('>H<sub>2</sub>O</a>');
+  });
+
   it('can be turned off, restoring GFM single-tilde strikethrough', async () => {
     const out = await html('H~2~O x^2^', { subSuperscript: false });
     expect(out).toContain('H<del>2</del>O');
@@ -190,6 +211,20 @@ describe('tabs', () => {
     expect(r.html).toContain('user-content-featherdown-tab-1-1');
   });
 
+  it('skips generated ids that a heading slug already uses', async () => {
+    // "Featherdown tab 1 1" slugs to `featherdown-tab-1-1`, the first tab's natural id.
+    const r = await fd.parse(`${md}\n\n## Featherdown tab 1 1\n\n## Featherdown panel 2 2`);
+    const ids = [...r.html.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.filter((id) => id === 'featherdown-tab-1-1')).toHaveLength(1);
+    // Headings keep their slugs. Group 1 is blocked by `featherdown-tab-1-1` and group 2 by
+    // `featherdown-panel-2-2`, so the tabs land in group 3.
+    expect(r.html).toContain('<h2 id="featherdown-tab-1-1">');
+    expect(r.html).toContain('<h2 id="featherdown-panel-2-2">');
+    expect(r.html).toContain('id="featherdown-tab-3-1"');
+    expect(r.html).toContain('aria-controls="featherdown-panel-3-1"');
+  });
+
   it('does not let raw HTML inject buttons or arbitrary tab attributes', async () => {
     const out = await html('<button role="tab" onclick="x()">hi</button><div class="tab-panel" onclick="x()">p</div>');
     expect(out).not.toContain('<button');
@@ -217,6 +252,30 @@ describe('inline colons are not directives', () => {
     for (const out of [(await fd.parse(text)).html, (await renderMarkdownDocument(text)).html]) {
       expect(out).toBe(`<p>${text.replace(/\{#x\}/, '{#x}')}</p>`);
     }
+  });
+});
+
+describe('inline directives and user remark plugins', () => {
+  it('user remark plugins never see textDirective nodes (they are restored to text first)', async () => {
+    let seen = 0;
+    let sawText = '';
+    const spy = () => (tree: import('mdast').Root) => {
+      const walk = (node: { type: string; value?: string; children?: unknown[] }): void => {
+        if (node.type === 'textDirective') seen += 1;
+        if (node.type === 'text' && node.value) sawText += node.value;
+        for (const child of node.children ?? []) walk(child as typeof node);
+      };
+      walk(tree);
+    };
+    const r = await new Featherdown({ plugins: { remark: [spy] } }).parse('Meet at 10:30, :abbr[HTML]{title="x"}');
+    expect(seen).toBe(0);
+    expect(sawText).toContain(':abbr[HTML]{title="x"}');
+    expect(r.html).toContain(':abbr[HTML]{title="x"}');
+  });
+
+  it('keeps `:30` inside a directive label', async () => {
+    const out = await html(':::note[at 10:30]\nbody\n:::');
+    expect(out).toContain('at 10:30');
   });
 });
 

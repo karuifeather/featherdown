@@ -1,4 +1,4 @@
-import type { Emphasis, Parent, PhrasingContent, Root, Text } from 'mdast';
+import type { Emphasis, Link, Parent, PhrasingContent, Root, Text } from 'mdast';
 import { SKIP, visit } from 'unist-util-visit';
 
 /**
@@ -34,10 +34,20 @@ function split(value: string): PhrasingContent[] | undefined {
   return out;
 }
 
-/** GFM literal autolinks (`https://x.com/a~b~c`) have a text child spanning the whole link. */
-function isLiteralAutolinkText(parent: Parent, node: Text): boolean {
+/**
+ * True for link text that is the URL itself: GFM literal autolinks
+ * (`https://x.com/a~b~c`, `www.x.com/a~b~c`, `me@x.com`), `<https://x.com/a~b~c>`
+ * and `[https://x.com/a~b~c](https://x.com/a~b~c)`. Changing that text would
+ * misreport where the link goes.
+ */
+function isUrlText(parent: Parent, node: Text): boolean {
   if (parent.type !== 'link') {
     return false;
+  }
+  const { url } = parent as Link;
+  const text = node.value;
+  if (url === text || url === `http://${text}` || url === `https://${text}` || url === `mailto:${text}`) {
+    return true;
   }
   const a = parent.position;
   const b = node.position;
@@ -62,7 +72,7 @@ export default function remarkSubSuperscript() {
       if (!parent || index === undefined || (!node.value.includes('^') && !node.value.includes('~'))) {
         return undefined;
       }
-      if (isLiteralAutolinkText(parent, node)) {
+      if (isUrlText(parent, node)) {
         return undefined;
       }
       const replacement = split(node.value);

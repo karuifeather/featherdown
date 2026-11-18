@@ -300,7 +300,7 @@ const featherdown = new Featherdown({
   - **`decoding`** — `"async"` (default), `"sync"`, `"auto"`, or `false` to omit the attribute.
   - **`figure`** — Default `false`. When `true`, a paragraph containing only one titled image becomes `<figure class="markdown-figure">` with a `<figcaption>` from the title, and the `title` attribute is dropped. Linked images keep the link inside the figure.
 - **`embeds`** — Allowlisted iframes and `::embed` directives. **Opt in** (default off). See [Embeds](#embeds).
-- **`plugins`** — Extra unified plugins: `{ remark?, rehype? }`. See [Security and trust](#security-and-trust).
+- **`plugins`** — Extra unified plugins: `{ remark?, rehype? }`. See [Security and trust](#security-and-trust). Remark plugins run after Featherdown's own directive stages. By then every inline directive (`:name[label]{attrs}`, including accidental ones such as `10:30`) and every container directive Featherdown does not handle is plain text, so a remark plugin cannot add its own inline or container directives. Unhandled leaf directives (`::name{attrs}`) are still present in the tree.
 - **`kind`**, **`slug`**, **`manifest`** — Manifest-based image URL rewriting. See [Links and images](#links-and-images).
 
 Avoid treating every nested field on `FeatherdownOptions` as a global behavioral switch unless documented here.
@@ -533,7 +533,7 @@ document.querySelectorAll(".featherdown-content .tabs").forEach((group) => {
 });
 ```
 
-Ids use a `featherdown-` prefix. Author ids are prefixed `user-content-`, so they cannot collide. A `:::tabs` block with no `:::tab` panels, content outside a panel, or a `:::tab` outside any `::::tabs` reports `tabs.invalid`. `result.assets.features.tabs` is `true` when a tab group was rendered. Set `tabs: false` to leave the directives as text.
+Generated ids look like `featherdown-tab-1-1` and `featherdown-panel-1-1`. They are checked against every id already in the document (heading slugs included), and a group number is skipped if any of its ids is taken, so ids stay unique. A `:::tabs` block with no `:::tab` panels, content outside a panel, or a `:::tab` outside any `::::tabs` reports `tabs.invalid`. `result.assets.features.tabs` is `true` when a tab group was rendered. Set `tabs: false` to leave the directives as text.
 
 ## Footnotes
 

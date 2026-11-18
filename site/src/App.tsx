@@ -1074,13 +1074,15 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              <button type="button" className={wrapLines ? "chip active" : "chip"} role="switch" aria-checked={wrapLines} onClick={toggleWrap}>
-                Wrap lines: {wrapLines ? "on" : "off"}
-              </button>
             </div>
             <div className="playground">
               <div className="pg-pane">
-                <div className="pg-head"><span>Markdown</span></div>
+                <div className="pg-head">
+                  <span>Markdown</span>
+                  <button type="button" className={wrapLines ? "chip chip-sm active" : "chip chip-sm"} role="switch" aria-checked={wrapLines} onClick={toggleWrap}>
+                    Wrap lines: {wrapLines ? "on" : "off"}
+                  </button>
+                </div>
                 <div className="playground-editor">
                   <CodeMirror
                     className="playground-codemirror"

@@ -1,7 +1,7 @@
 import type { BlockContent, Root, RootContent } from 'mdast';
 import { SKIP, visit } from 'unist-util-visit';
 
-const SUPPORTED_CALLOUT_TYPES = [
+export const CALLOUT_TYPES = [
   'note',
   'tip',
   'warning',
@@ -12,7 +12,7 @@ const SUPPORTED_CALLOUT_TYPES = [
   'caution',
   'important',
 ] as const;
-type SupportedCalloutType = (typeof SUPPORTED_CALLOUT_TYPES)[number];
+type SupportedCalloutType = (typeof CALLOUT_TYPES)[number];
 
 const DEFAULT_TITLES: Record<SupportedCalloutType, string> = {
   note: 'Note',
@@ -27,7 +27,7 @@ const DEFAULT_TITLES: Record<SupportedCalloutType, string> = {
 };
 
 function isSupportedCalloutType(value: string): value is SupportedCalloutType {
-  return (SUPPORTED_CALLOUT_TYPES as readonly string[]).includes(value);
+  return (CALLOUT_TYPES as readonly string[]).includes(value);
 }
 
 function createMarkerParagraph(value: string): RootContent {

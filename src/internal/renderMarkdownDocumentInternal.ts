@@ -1,10 +1,15 @@
 import { toText } from 'hast-util-to-text';
 import { EXIT, visit } from 'unist-util-visit';
+import { VFile } from 'vfile';
 import {
+  ALL_FEATURES_ON,
   createMarkdownProcessorInternal,
+  type MarkdownProcessor,
   type MarkdownProcessorFeatureGates,
+  type MermaidPluginsFactory,
 } from './createMarkdownProcessorInternal.js';
 import { createDiagnosticCollector } from './diagnostics.js';
+import { setPipelineContext } from './pipelineContext.js';
 import type {
   HeadingMetadata,
   RenderMarkdownDocumentResult,
@@ -119,28 +124,70 @@ function estimateReadingMinutes(wordCount: number): number {
   return Math.max(1, Math.ceil(wordCount / WORDS_PER_MINUTE));
 }
 
+const processorCache = new Map<string, MarkdownProcessor>();
+
+function cacheKey(gates: MarkdownProcessorFeatureGates, mermaid: boolean): string {
+  return [
+    mermaid,
+    gates.math,
+    gates.code,
+    gates.codeHighlighting,
+    gates.charts,
+    gates.sanitize,
+  ]
+    .map((flag) => (flag ? '1' : '0'))
+    .join('');
+}
+
 /**
- * Render markdown through the default browser-safe pipeline and derive
- * publishing metadata from the final processed document tree.
+ * Return a frozen processor for these gates, building it once. Processors hold
+ * no per-parse state (diagnostics and image options travel on the vfile), so a
+ * cached instance is safe to share across sequential and concurrent parses.
+ */
+function getCachedProcessor(
+  gates: MarkdownProcessorFeatureGates,
+  mermaidPlugins: MermaidPluginsFactory | undefined,
+): MarkdownProcessor {
+  const key = cacheKey(gates, mermaidPlugins !== undefined);
+  let processor = processorCache.get(key);
+  if (!processor) {
+    processor = createMarkdownProcessorInternal({
+      features: gates,
+      preserveHeadingCustomIdMarker: true,
+      contextFromFile: true,
+      ...(mermaidPlugins ? { mermaidPlugins } : {}),
+    }).freeze();
+    processorCache.set(key, processor);
+  }
+  return processor;
+}
+
+export type RenderDocumentPipelineOptions = {
+  /** Node-only Mermaid stage; omit for the browser-safe pipeline. */
+  mermaidPlugins?: MermaidPluginsFactory;
+};
+
+/**
+ * Render markdown and derive publishing metadata from the final processed
+ * document tree. Uses the browser-safe pipeline unless `mermaidPlugins` is set.
  */
 export async function renderMarkdownDocumentInternal(
   markdown: string,
   options?: RenderMarkdownOptions,
   pipelineFeatures?: MarkdownProcessorFeatureGates,
+  pipeline?: RenderDocumentPipelineOptions,
 ): Promise<RenderMarkdownDocumentResult> {
   const collector = createDiagnosticCollector();
-  const processor = createMarkdownProcessorInternal({
-    ...options,
-    emitDiagnostic: collector.emit,
-    preserveHeadingCustomIdMarker: true,
-    ...(pipelineFeatures !== undefined ? { features: pipelineFeatures } : {}),
-  });
+  const processor = getCachedProcessor(pipelineFeatures ?? ALL_FEATURES_ON, pipeline?.mermaidPlugins);
 
-  const parsed = processor.parse(markdown);
-  const root: HastRoot = await processor.run(parsed);
+  const file = new VFile(markdown);
+  setPipelineContext(file, { ...options, emitDiagnostic: collector.emit });
+
+  const parsed = processor.parse(file);
+  const root: HastRoot = await processor.run(parsed, file);
 
   const headings = extractHeadings(root);
-  const html = String(processor.stringify(root));
+  const html = String(processor.stringify(root, file));
   const wordCount = countWords(root);
 
   return {

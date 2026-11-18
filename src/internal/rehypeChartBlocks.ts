@@ -4,6 +4,7 @@ import { visit } from 'unist-util-visit';
 import type { Plugin } from 'unified';
 import { CHART_BLOCK_TYPE_SET } from './chartTypes.js';
 import type { DiagnosticEmitter } from './diagnostics.js';
+import { getPipelineContext } from './pipelineContext.js';
 
 const LANG_PREFIX = 'language-chart-';
 
@@ -29,8 +30,8 @@ const rehypeChartBlocks: Plugin<
   [{ emitDiagnostic?: DiagnosticEmitter }?],
   Root
 > = function rehypeChartBlocks(options) {
-  const emitDiagnostic = options?.emitDiagnostic;
-  return (tree): undefined => {
+  return (tree, file): undefined => {
+    const emitDiagnostic = options?.emitDiagnostic ?? getPipelineContext(file)?.emitDiagnostic;
     visit(tree, 'element', (node, index, parent) => {
       if (node.tagName !== 'pre') return;
       if (!parent || typeof index !== 'number') return;

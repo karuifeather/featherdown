@@ -1,11 +1,7 @@
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeKatex from 'rehype-katex';
-import rehypeCodeBlockTitles from './rehypeCodeBlockTitles.js';
-import rehypeCodeLineHighlights from './rehypeCodeLineHighlights.js';
 import rehypeRaw from 'rehype-raw';
-import rehypeChartBlocksInternal from './rehypeChartBlocksInternal.js';
-import rehypeCdnImagesInternal from './rehypeCdnImagesInternal.js';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeSlug from 'rehype-slug';
 import rehypeStringify from 'rehype-stringify';
@@ -15,15 +11,19 @@ import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import remarkRehype from 'remark-rehype';
 import type { Root as HastRoot } from 'hast';
-import { visit } from 'unist-util-visit';
 import type { Root as MdastRoot } from 'mdast';
-import type { Processor } from 'unified';
+import type { PluggableList, Processor } from 'unified';
 import { unified } from 'unified';
+import { visit } from 'unist-util-visit';
 import type { RenderMarkdownOptions } from '../types.js';
+import type { DiagnosticEmitter } from './diagnostics.js';
 import { remarkHeadingIds } from './headingIdsRemark.js';
+import rehypeCdnImagesInternal from './rehypeCdnImagesInternal.js';
+import rehypeChartBlocksInternal from './rehypeChartBlocksInternal.js';
+import rehypeCodeBlockTitles from './rehypeCodeBlockTitles.js';
+import rehypeCodeLineHighlights from './rehypeCodeLineHighlights.js';
 import { remarkCallouts } from './remarkCallouts.js';
 import { remarkCodeBlockTitles } from './remarkCodeBlockTitles.js';
-import type { DiagnosticEmitter } from './diagnostics.js';
 import { markdownSanitizeSchema } from './sanitizeSchema.js';
 
 /** Optional pipeline stages for {@link Featherdown}; omit for legacy all-on behavior. */
@@ -35,10 +35,34 @@ export type MarkdownProcessorFeatureGates = {
   sanitize: boolean;
 };
 
-type InternalOptions = RenderMarkdownOptions & {
+/** Returns the Mermaid render (and post-render sanitize) stage for the given gates. */
+export type MermaidPluginsFactory = (gates: MarkdownProcessorFeatureGates) => PluggableList;
+
+export type MarkdownProcessor = Processor<MdastRoot, MdastRoot, HastRoot>;
+
+export type InternalProcessorOptions = RenderMarkdownOptions & {
   emitDiagnostic?: DiagnosticEmitter;
   preserveHeadingCustomIdMarker?: boolean;
   features?: MarkdownProcessorFeatureGates;
+  /**
+   * Plugins that render Mermaid fences (Node-only). Injected by the Node entry
+   * so the browser entry never imports `rehype-mermaid` / Playwright.
+   */
+  mermaidPlugins?: MermaidPluginsFactory;
+  /**
+   * When true, per-parse state (diagnostics, image manifest) is read from the
+   * vfile instead of being captured from these options, so the processor can
+   * be cached and shared across parses.
+   */
+  contextFromFile?: boolean;
+};
+
+export const ALL_FEATURES_ON: MarkdownProcessorFeatureGates = {
+  math: true,
+  code: true,
+  codeHighlighting: true,
+  charts: true,
+  sanitize: true,
 };
 
 function rehypeStripHeadingCustomIdMarker() {
@@ -53,21 +77,17 @@ function rehypeStripHeadingCustomIdMarker() {
 }
 
 /**
- * Build the default browser-safe unified processor used by public APIs.
+ * Build the unified processor shared by every public API.
  *
- * Internal helper that wires remark/rehype plugins for math, highlighting,
- * sanitization, heading ids, chart placeholders, and image rewriting.
+ * Ordering is security-relevant: author content (Markdown + raw HTML) is
+ * sanitized right after raw HTML is parsed, and only then do Featherdown's own
+ * plugins add trusted markup (Mermaid SVG, chart mounts, code chrome, KaTeX,
+ * heading anchors, highlighting, image rewriting). The Mermaid path sanitizes
+ * its SVG output in a second, SVG-aware pass.
  */
-export function createMarkdownProcessorInternal(
-  options?: InternalOptions,
-): Processor<MdastRoot, MdastRoot, HastRoot> {
-  const gates: MarkdownProcessorFeatureGates = options?.features ?? {
-    math: true,
-    code: true,
-    codeHighlighting: true,
-    charts: true,
-    sanitize: true,
-  };
+export function createMarkdownProcessorInternal(options?: InternalProcessorOptions): MarkdownProcessor {
+  const gates = options?.features ?? ALL_FEATURES_ON;
+  const contextFromFile = options?.contextFromFile === true;
 
   const processor = unified().use(remarkParse).use(remarkGfm).use(remarkDirective);
 
@@ -83,24 +103,31 @@ export function createMarkdownProcessorInternal(
 
   processor.use(remarkRehype, { allowDangerousHtml: true }).use(rehypeRaw);
 
+  if (gates.sanitize) {
+    processor.use(rehypeSanitize, markdownSanitizeSchema);
+  }
+
+  // Code chrome runs before Mermaid so titled / copyable Mermaid fences keep
+  // their wrapper when the <pre> is replaced by SVG. It skips chart fences.
+  if (gates.code) {
+    processor.use(rehypeCodeBlockTitles);
+  }
+
+  if (options?.mermaidPlugins) {
+    processor.use(options.mermaidPlugins(gates));
+  }
+
   if (gates.charts) {
-    if (options?.emitDiagnostic) {
+    if (!contextFromFile && options?.emitDiagnostic) {
       processor.use(rehypeChartBlocksInternal, { emitDiagnostic: options.emitDiagnostic });
     } else {
       processor.use(rehypeChartBlocksInternal);
     }
   }
 
-  if (gates.code) {
-    processor.use(rehypeCodeBlockTitles);
-  }
-
   if (gates.math) {
-    processor.use(rehypeKatex, { output: 'html' });
-  }
-
-  if (gates.sanitize) {
-    processor.use(rehypeSanitize, markdownSanitizeSchema);
+    // KaTeX runs after sanitize, so keep its own HTML-extension commands (\href, \htmlStyle, ...) off.
+    processor.use(rehypeKatex, { output: 'html', trust: false });
   }
 
   processor.use(rehypeSlug).use(rehypeAutolinkHeadings, { behavior: 'wrap' });
@@ -113,7 +140,13 @@ export function createMarkdownProcessorInternal(
     processor.use(rehypeStripHeadingCustomIdMarker);
   }
 
-  processor.use(rehypeCdnImagesInternal, options).use(rehypeStringify);
+  if (contextFromFile) {
+    processor.use(rehypeCdnImagesInternal);
+  } else {
+    processor.use(rehypeCdnImagesInternal, options);
+  }
 
-  return processor as unknown as Processor<MdastRoot, MdastRoot, HastRoot>;
+  processor.use(rehypeStringify);
+
+  return processor as unknown as MarkdownProcessor;
 }

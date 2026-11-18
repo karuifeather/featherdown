@@ -177,11 +177,11 @@ describe('renderMarkdownToHtml', () => {
     expect(html).not.toContain('{#custom-slug}');
   });
 
-  it('keeps safe raw HTML and drops script tags after sanitize', async () => {
+  it('keeps safe raw HTML, strips author classes, and drops script tags after sanitize', async () => {
     const md = '<p class="note">Allowed</p>\n\n<script>evil()</script>\n';
     const html = await renderMarkdownToHtml(md);
-    expect(html).toContain('class="note"');
-    expect(html).toContain('Allowed');
+    expect(html).toContain('<p>Allowed</p>');
+    expect(html).not.toContain('class="note"');
     expect(html).not.toContain('script');
     expect(html).not.toContain('evil');
   });

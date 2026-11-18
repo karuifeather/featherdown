@@ -25,8 +25,6 @@ export type ResolvedFeatherdownOptions = {
   charts: boolean;
   headings: {
     enabled: boolean;
-    slugs: boolean;
-    anchors: boolean;
     toc: boolean;
   };
   publishing: {
@@ -49,8 +47,6 @@ const DEFAULT_CODE: ResolvedFeatherdownOptions['code'] = {
 
 const DEFAULT_HEADINGS: ResolvedFeatherdownOptions['headings'] = {
   enabled: true,
-  slugs: true,
-  anchors: true,
   toc: true,
 };
 
@@ -208,8 +204,6 @@ function normalizeHeadings(
     if (!value) {
       return {
         enabled: false,
-        slugs: false,
-        anchors: false,
         toc: false,
       };
     }
@@ -217,8 +211,6 @@ function normalizeHeadings(
   }
   return {
     enabled: true,
-    slugs: value.slugs ?? base.slugs,
-    anchors: value.anchors ?? base.anchors,
     toc: value.toc ?? base.toc,
   };
 }

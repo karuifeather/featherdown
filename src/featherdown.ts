@@ -1,10 +1,5 @@
-import { buildFeatherdownResult } from './internal/buildFeatherdownResult.js';
-import { buildMetadataFromFrontmatter } from './internal/buildMetadataFromFrontmatter.js';
-import { pickRenderMarkdownOptions, toProcessorGates } from './internal/featherdownParseHelpers.js';
-import { parseFrontmatter } from './internal/parseFrontmatter.js';
-import { renderMarkdownDocumentInternal } from './internal/renderMarkdownDocumentInternal.js';
-import { mergeFeatherdownOptions, resolveFeatherdownOptions } from './internal/resolveFeatherdownOptions.js';
-import { throwIfStrictDiagnosticsViolated } from './internal/throwIfStrictDiagnosticsViolated.js';
+import { mergeFeatherdownOptions } from './internal/resolveFeatherdownOptions.js';
+import { runFeatherdownParse } from './internal/runFeatherdownParse.js';
 import type { FeatherdownOptions, FeatherdownParseOptions, FeatherdownResult } from './types.js';
 
 /**
@@ -26,22 +21,6 @@ export class Featherdown {
    * shallow one-level merge.
    */
   async parse(markdown: string, parseOptions?: FeatherdownParseOptions): Promise<FeatherdownResult> {
-    const mergedOptions = mergeFeatherdownOptions(this.defaultOptions, parseOptions);
-    const resolvedOptions = resolveFeatherdownOptions(mergedOptions);
-    const legacy = pickRenderMarkdownOptions(mergedOptions);
-
-    const fm = parseFrontmatter(markdown, resolvedOptions.frontmatter);
-    const metadata = buildMetadataFromFrontmatter(fm.frontmatter);
-    const document = await renderMarkdownDocumentInternal(fm.body, legacy, toProcessorGates(resolvedOptions));
-
-    const result = buildFeatherdownResult({
-      body: fm.body,
-      frontmatter: fm.frontmatter,
-      metadata,
-      document,
-      options: resolvedOptions,
-    });
-    throwIfStrictDiagnosticsViolated(resolvedOptions, result);
-    return result;
+    return runFeatherdownParse(markdown, mergeFeatherdownOptions(this.defaultOptions, parseOptions));
   }
 }

@@ -1,6 +1,7 @@
 import type { Element, Root } from 'hast';
 import { visit } from 'unist-util-visit';
 import type { DiagnosticEmitter } from './diagnostics.js';
+import { getPipelineContext } from './pipelineContext.js';
 
 type ManifestEntry = { url: string };
 
@@ -37,15 +38,19 @@ function ensureInlineClass(node: Element): void {
 /**
  * Rehype plugin that annotates image classes and rewrites image URLs via
  * optional manifest maps.
+ *
+ * When no options are passed, per-parse options are read from the vfile
+ * (see `pipelineContext.ts`) so a cached processor can serve every parse.
  */
 export default function rehypeCdnImages(options?: RehypeCdnImagesOptions) {
-  const kind = options?.kind;
-  const slug = options?.slug;
-  const map = options?.manifest?.map;
-  const remote = options?.manifest?.remote;
-  const emitDiagnostic = options?.emitDiagnostic;
+  return (tree: Root, file?: { data: unknown }): undefined => {
+    const resolved = options ?? getPipelineContext(file);
+    const kind = resolved?.kind;
+    const slug = resolved?.slug;
+    const map = resolved?.manifest?.map;
+    const remote = resolved?.manifest?.remote;
+    const emitDiagnostic = resolved?.emitDiagnostic;
 
-  return (tree: Root): undefined => {
     visit(tree, 'element', (node) => {
       if (node.tagName !== 'img') return;
 

@@ -21,7 +21,7 @@ describe('renderMarkdownToHtmlWithMermaid', () => {
   it('keeps titled non-mermaid code fences as highlighted code blocks in the mermaid path', async () => {
     const md = ['```ts title="example.ts"', 'const value = 1;', '```', ''].join('\n');
     const html = await renderMarkdownToHtmlWithMermaid(md);
-    expect(html).toContain('<div class="code-block"><div class="code-block-title">example.ts</div><pre><code class="language-ts">');
+    expect(html).toContain('<div class="code-block"><div class="code-block-title">example.ts</div><pre><code class="hljs language-ts">');
     expect(html).toMatch(/hljs-keyword/);
   });
 
@@ -35,7 +35,7 @@ describe('renderMarkdownToHtmlWithMermaid', () => {
   it('supports line numbers for ordinary non-mermaid code fences in the mermaid path', async () => {
     const md = ['```ts showLineNumbers', 'const a = 1;', 'const b = 2;', '```', ''].join('\n');
     const html = await renderMarkdownToHtmlWithMermaid(md);
-    expect(html).toContain('<code class="language-ts code-line-numbered">');
+    expect(html).toContain('<code class="hljs language-ts code-line-numbered">');
     expect(html).toContain('<span class="code-line-number">1</span>');
     expect(html).toContain('<span class="code-line-number">2</span>');
     expect(html).toMatch(/hljs-keyword/);
@@ -46,7 +46,7 @@ describe('renderMarkdownToHtmlWithMermaid', () => {
     const html = await renderMarkdownToHtmlWithMermaid(md);
     expect(html).toContain('<div class="code-block code-block-copyable">');
     expect(html).toContain('<button type="button" class="code-block-copy-button" data-code-copy=""');
-    expect(html).toContain('<code class="language-ts" data-code-copy-target="code-copy-target-1">');
+    expect(html).toContain('<code class="hljs language-ts" data-code-copy-target="code-copy-target-1">');
     expect(html).toMatch(/hljs-keyword/);
   });
 
@@ -93,10 +93,10 @@ describe('renderMarkdownToHtmlWithMermaid', () => {
       '',
     ].join('\n');
     const html = await renderMarkdownToHtmlWithMermaid(md);
-    expect(html).toContain('<h1 id="user-content-intro"><a href="#intro">Intro</a></h1>');
-    expect(html).toContain('<pre><code class="language-mermaid">graph TD; A-->\n</code></pre>');
+    expect(html).toContain('<h1 id="intro"><a href="#intro">Intro</a></h1>');
+    expect(html).toContain('<pre><code class="hljs language-mermaid">graph TD; A-->\n</code></pre>');
     expect(html).toContain('<p>After diagram.</p>');
-    expect(html).toContain('<pre><code class="language-ts">');
+    expect(html).toContain('<pre><code class="hljs language-ts">');
     expect(html).toContain('<span class="hljs-keyword">const</span> x = <span class="hljs-number">1</span>;');
     expect(html).not.toContain('<svg');
   });

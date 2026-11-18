@@ -1,74 +1,57 @@
 import type { Schema } from 'hast-util-sanitize';
 import { defaultSchema } from 'rehype-sanitize';
-import { CHART_BLOCK_TYPES } from './chartTypes.js';
+import { CALLOUT_TYPES } from './remarkCallouts.js';
 
 /**
- * Extends the GitHub-style default sanitizer for this pipeline:
+ * Strict schema applied to **author content**, immediately after raw HTML is
+ * parsed and before any Featherdown plugin adds trusted markup.
  *
- * - **`className` on `*`** — highlight.js and KaTeX mark up nested spans (and raw HTML
- *   may set classes on other allowed tags). The base schema does not allow
- *   arbitrary classes without this.
- * - **`style` on `span` only** — KaTeX `output: 'html'` uses inline `style` on spans for
- *   layout; samples from KaTeX do not attach `style` to other tag names. Allowing
- *   `style` on every element would broaden XSS surface for author-controlled raw HTML.
- * - **Chart placeholders** — `div.chart-mount` with `dataChart` / `dataChartData` (narrow
- *   allowed chart type strings; data payload is the JSON string).
+ * Because KaTeX, chart mounts, code-block chrome, heading anchors, syntax
+ * highlighting, and image rewriting all run *after* this pass, the schema only
+ * needs to keep what Markdown itself produces at that point:
  *
- * Scripts remain stripped (`strip: ['script']`).
+ * - **`code`** — `language-*` plus remark-math's `math-inline` / `math-display`
+ *   classes, and the fence-meta data attributes read later by the code plugins.
+ * - **Callouts** — `div.callout`, `div.callout-<type>`, `div.callout-title`.
+ * - **Headings** — `dataHeadingCustomId` (internal marker, removed before output).
+ *
+ * No `style` attribute and no free-form `className` are allowed, so raw HTML
+ * cannot position overlays or borrow host-app / Featherdown classes beyond the
+ * callout classes Markdown directives already grant. Scripts stay stripped.
  */
 const baseAttrs = defaultSchema.attributes ?? {};
 const baseStar = baseAttrs['*'] ?? [];
-const baseSpan = baseAttrs.span ?? [];
 const baseDiv = baseAttrs.div ?? [];
-const baseCode = baseAttrs.code ?? [];
-const baseButton = baseAttrs.button ?? [];
 const baseH1 = baseAttrs.h1 ?? [];
 const baseH2 = baseAttrs.h2 ?? [];
 const baseH3 = baseAttrs.h3 ?? [];
 const baseH4 = baseAttrs.h4 ?? [];
 const baseH5 = baseAttrs.h5 ?? [];
 const baseH6 = baseAttrs.h6 ?? [];
-const baseTags = defaultSchema.tagNames ?? [];
 const calloutClassNames = [
   'callout',
-  'callout-note',
-  'callout-tip',
-  'callout-warning',
-  'callout-info',
-  'callout-success',
-  'callout-danger',
-  'callout-error',
-  'callout-caution',
-  'callout-important',
+  ...CALLOUT_TYPES.map((type) => `callout-${type}`),
   'callout-title',
-  'chart-mount',
-  'code-block',
-  'code-block-title',
-  'code-block-copyable',
-] as const;
-const buttonClassNames = ['code-block-copy-button'] as const;
+];
 
 export const markdownSanitizeSchema: Schema = {
   ...defaultSchema,
-  tagNames: [...baseTags, 'button'],
   attributes: {
     ...baseAttrs,
-    '*': [...baseStar, 'className'],
-    span: [...baseSpan, 'style'],
-    code: [...baseCode, 'className', 'dataCodeCopyTarget', 'dataCodeLineHighlights', 'dataCodeLineNumbers'],
-    button: [...baseButton, ['className', ...buttonClassNames], 'type', 'dataCodeCopy', 'dataCodeCopyTarget'],
+    code: [
+      ['className', /^language-./, 'math-inline', 'math-display'],
+      'dataCodeBlockTitle',
+      'dataCodeCopyButton',
+      'dataCodeLineHighlights',
+      'dataCodeLineNumbers',
+    ],
     h1: [...baseH1, 'dataHeadingCustomId'],
     h2: [...baseH2, 'dataHeadingCustomId'],
     h3: [...baseH3, 'dataHeadingCustomId'],
     h4: [...baseH4, 'dataHeadingCustomId'],
     h5: [...baseH5, 'dataHeadingCustomId'],
     h6: [...baseH6, 'dataHeadingCustomId'],
-    div: [
-      ...baseDiv,
-      ['className', ...calloutClassNames],
-      ['dataChart', ...CHART_BLOCK_TYPES],
-      'dataChartData',
-    ],
+    div: [...baseDiv, ['className', ...calloutClassNames]],
   },
 };
 
@@ -101,23 +84,23 @@ const svgSharedAttributes = [
 ] as const;
 
 /**
- * Mermaid-capable sanitizer schema for the Node-only rendering path.
- * It extends the browser-safe schema with a narrow SVG allowlist used by
- * inline Mermaid output.
+ * Second-pass schema for the Node Mermaid path. It runs right after
+ * `rehype-mermaid`, over a tree whose author content already passed
+ * {@link markdownSanitizeSchema}, so its looser rules (classes and inline
+ * styles on HTML labels, a narrow SVG allowlist) only matter for Mermaid output.
  */
 export const schemaWithSvg: Schema = {
   ...markdownSanitizeSchema,
-  tagNames: [...(markdownSanitizeSchema.tagNames ?? []), ...svgTags],
+  tagNames: [...(markdownSanitizeSchema.tagNames ?? []), 'button', ...svgTags],
   attributes: {
     ...(markdownSanitizeSchema.attributes ?? {}),
-    div: [
-      ...baseDiv,
-      'style',
-      'xmlns',
-      ['className', ...calloutClassNames],
-      ['dataChart', ...CHART_BLOCK_TYPES],
-      'dataChartData',
-    ],
+    '*': [...baseStar, 'className'],
+    // Code-block chrome is added before Mermaid runs (author buttons were
+    // already removed by the strict pass).
+    button: [['className', 'code-block-copy-button'], ['type', 'button'], 'dataCodeCopy', 'dataCodeCopyTarget'],
+    code: [...(markdownSanitizeSchema.attributes?.code ?? []), 'dataCodeCopyTarget'],
+    span: ['style'],
+    div: [...baseDiv, 'style', 'xmlns'],
     svg: [
       ...svgSharedAttributes,
       'ariaRoleDescription',

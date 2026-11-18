@@ -1,4 +1,5 @@
-import { createMarkdownProcessorWithMermaidInternal } from './internal/createMarkdownProcessorWithMermaidInternal.js';
+import { createMarkdownProcessorInternal } from './internal/createMarkdownProcessorInternal.js';
+import { mermaidPlugins } from './internal/mermaidPlugins.js';
 import type { RenderMarkdownOptions } from './types.js';
 
 /**
@@ -16,7 +17,7 @@ export async function renderMarkdownToHtmlWithMermaid(
   markdown: string,
   options?: RenderMarkdownOptions,
 ): Promise<string> {
-  const processor = createMarkdownProcessorWithMermaidInternal(options);
+  const processor = createMarkdownProcessorInternal({ ...options, mermaidPlugins });
   const file = await processor.process(markdown);
   return String(file);
 }

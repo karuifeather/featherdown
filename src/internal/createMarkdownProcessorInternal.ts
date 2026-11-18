@@ -1,6 +1,5 @@
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import rehypeHighlight from 'rehype-highlight';
-import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeSlug from 'rehype-slug';
@@ -23,6 +22,7 @@ import rehypeChartBlocksInternal from './rehypeChartBlocksInternal.js';
 import rehypeCodeBlockTitles from './rehypeCodeBlockTitles.js';
 import rehypeCodeLineHighlights from './rehypeCodeLineHighlights.js';
 import rehypeDedupeFootnoteIds from './rehypeDedupeFootnoteIds.js';
+import rehypeKatexConfigured from './rehypeKatexConfigured.js';
 import rehypeResolveClobberedHrefs from './rehypeResolveClobberedHrefs.js';
 import { remarkCallouts } from './remarkCallouts.js';
 import { remarkCodeBlockTitles } from './remarkCodeBlockTitles.js';
@@ -187,8 +187,9 @@ export function createMarkdownProcessorInternal(options?: InternalProcessorOptio
   }
 
   if (gates.math) {
-    // KaTeX runs after sanitize, so keep its own HTML-extension commands (\href, \htmlStyle, ...) off.
-    processor.use(rehypeKatex, { output: 'html', trust: false });
+    // KaTeX runs after sanitize, so its HTML-extension commands (\href, \htmlStyle, ...) stay
+    // off unless `math.trust` is set. Options are read per parse (see rehypeKatexConfigured).
+    processor.use(rehypeKatexConfigured);
   }
 
   processor.use(rehypeSlug).use(rehypeAutolinkHeadings, { behavior: 'wrap' });

@@ -63,7 +63,7 @@ export type RenderDiagnostic = {
   /**
    * Pipeline component that emitted the diagnostic.
    */
-  source: 'chart' | 'images' | 'embeds' | 'code' | 'links';
+  source: 'chart' | 'images' | 'embeds' | 'code' | 'links' | 'math' | 'tabs';
 };
 
 /**
@@ -154,6 +154,30 @@ export type RenderMarkdownDocumentResult = {
  */
 export type FeatherdownMathOptions = {
   enabled?: boolean;
+  /**
+   * KaTeX macros, for example `{ "\\R": "\\mathbb{R}" }`. Keys start with a
+   * backslash. Each parse works on its own copy, so `\gdef` in one document
+   * never leaks into another. Constructor and per-parse macros are merged
+   * (per-parse wins on a key conflict).
+   */
+  macros?: Record<string, string>;
+  /**
+   * Allow KaTeX's HTML-extension commands (`\href`, `\url`, `\includegraphics`,
+   * `\htmlClass`, `\htmlId`, `\htmlStyle`, `\htmlData`). KaTeX output is added
+   * **after** sanitization, so `true` lets math author arbitrary links, ids,
+   * classes and inline styles. Use it for trusted content only. Default `false`;
+   * while it is off, each blocked command is reported as a `math.trust` diagnostic.
+   */
+  trust?: boolean;
+  /**
+   * How KaTeX treats input that is valid but not strict LaTeX (for example
+   * Unicode text in math mode). `"ignore"` (default) stays silent, `"warn"`
+   * reports a `math.strict` diagnostic, `"error"` (or `true`) reports a
+   * `math.render` diagnostic. The equation renders either way, so use these
+   * with `diagnostics: "strict"` to fail a build on non-strict LaTeX.
+   * `false` is `"ignore"`.
+   */
+  strict?: boolean | 'ignore' | 'warn' | 'error';
 };
 
 /**

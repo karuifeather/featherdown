@@ -26,7 +26,12 @@ export type ResolvedFeatherdownOptions = {
   kind?: string;
   slug?: string;
   manifest?: RenderMarkdownOptions['manifest'];
-  math: { enabled: boolean };
+  math: {
+    enabled: boolean;
+    macros: Record<string, string>;
+    trust: boolean;
+    strict: 'ignore' | 'warn' | 'error';
+  };
   code: {
     enabled: boolean;
     highlighting: boolean;
@@ -71,7 +76,12 @@ export type ResolvedFeatherdownOptions = {
   frontmatter: false | true | 'auto';
 };
 
-const DEFAULT_MATH: ResolvedFeatherdownOptions['math'] = { enabled: true };
+const DEFAULT_MATH: ResolvedFeatherdownOptions['math'] = {
+  enabled: true,
+  macros: {},
+  trust: false,
+  strict: 'ignore',
+};
 
 const DEFAULT_CODE: ResolvedFeatherdownOptions['code'] = {
   enabled: true,
@@ -166,6 +176,19 @@ export function mergeFeatherdownOptions(
     }
   }
 
+  // `mergeGroup` is one level deep, so macros would be replaced wholesale.
+  const ctorMath = constructorOptions?.math;
+  const parseMath = parseOptions?.math;
+  if (
+    typeof ctorMath === 'object' &&
+    typeof parseMath === 'object' &&
+    ctorMath.macros !== undefined &&
+    parseMath.macros !== undefined &&
+    typeof out.math === 'object'
+  ) {
+    out.math = { ...out.math, macros: { ...ctorMath.macros, ...parseMath.macros } };
+  }
+
   if (constructorOptions?.plugins || parseOptions?.plugins) {
     const remark = [...(constructorOptions?.plugins?.remark ?? []), ...(parseOptions?.plugins?.remark ?? [])];
     const rehype = [...(constructorOptions?.plugins?.rehype ?? []), ...(parseOptions?.plugins?.rehype ?? [])];
@@ -192,11 +215,43 @@ function normalizeMath(
     return { ...base };
   }
   if (typeof value === 'boolean') {
-    return { enabled: value };
+    return { ...base, macros: { ...base.macros }, enabled: value };
   }
   return {
     enabled: value.enabled ?? base.enabled,
+    macros: normalizeMacros(value.macros, base.macros),
+    trust: value.trust ?? base.trust,
+    strict: normalizeMathStrict(value.strict, base.strict),
   };
+}
+
+/** Keeps only string-to-string macro entries; the result is a fresh object. */
+function normalizeMacros(
+  value: Record<string, string> | undefined,
+  base: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = { ...base };
+  if (value) {
+    for (const [name, body] of Object.entries(value)) {
+      if (typeof body === 'string') {
+        out[name] = body;
+      }
+    }
+  }
+  return out;
+}
+
+function normalizeMathStrict(
+  value: FeatherdownMathOptions['strict'],
+  base: ResolvedFeatherdownOptions['math']['strict'],
+): ResolvedFeatherdownOptions['math']['strict'] {
+  if (value === undefined) {
+    return base;
+  }
+  if (value === true || value === 'error') {
+    return 'error';
+  }
+  return value === 'warn' ? 'warn' : 'ignore';
 }
 
 function normalizeCode(

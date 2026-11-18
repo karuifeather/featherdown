@@ -45,5 +45,6 @@ export function toPipelineFeatureConfig(resolved: ResolvedFeatherdownOptions): P
     links: resolved.links,
     images: resolved.images,
     embeds: resolved.embeds,
+    math: { macros: resolved.math.macros, trust: resolved.math.trust, strict: resolved.math.strict },
   };
 }

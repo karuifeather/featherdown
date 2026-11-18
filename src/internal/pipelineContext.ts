@@ -11,6 +11,7 @@ export type PipelineFeatureConfig = {
   links?: ResolvedFeatherdownOptions['links'];
   images?: ResolvedFeatherdownOptions['images'];
   embeds?: ResolvedFeatherdownOptions['embeds'];
+  math?: Omit<ResolvedFeatherdownOptions['math'], 'enabled'>;
 };
 
 /**

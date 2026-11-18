@@ -65,21 +65,23 @@ You can import the library from JSR (see [@karuifeather/featherdown](https://jsr
 import { Featherdown } from "featherdown";
 import "featherdown/styles.css";
 
-const featherdown = new Featherdown({ frontmatter: "auto" });
+const featherdown = new Featherdown();
 
-const result = await featherdown.parse(`---
-title: Hello
----
-
-# Hello
-
-Some **Markdown**.`);
+const result = await featherdown.parse("# Hello\n\nSome **Markdown**.");
 
 // Wrap the HTML in .featherdown-content or the shipped CSS will not apply.
 const page = `<article class="featherdown-content">${result.html}</article>`;
 
-console.log(result.metadata.title); // "Hello"
 console.log(result.toc); // [{ depth: 1, text: "Hello", id: "hello" }]
+```
+
+To read YAML front matter, opt in with `frontmatter: "auto"`:
+
+```ts
+const withMeta = new Featherdown({ frontmatter: "auto" });
+const post = await withMeta.parse("---\ntitle: Hello\n---\n\n# Hello");
+
+console.log(post.metadata.title); // "Hello"
 ```
 
 Three things to know before you go further:

@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Node Mermaid output no longer re-prefixes every id in the document. Only the Mermaid SVG is re-sanitized, and Node output matches the browser entry for non-Mermaid content.
 - The footnotes heading is excluded from `toc` and `headings`.
 - Footnote markers and gaps are stripped from `excerpt`, and the excerpt is never taken from the footnotes section.
+- An author id that the sanitizer would prefix into a footnote id (`## Top {#fn-1}`, `<div id="fnref-1">`) is renamed with a numeric suffix (`user-content-fn-1-1`), so ids stay unique. `toc` and `headings` report the renamed id. Author links written as `#fn-1` still go to the footnote.
+- Highlighted code lines split correctly when a syntax token spans several lines (block comments, template literals). Each line gets its own `code-line` wrapper with the token's classes, so line highlights, line numbers and `diff` classes stay aligned.
 - Unquoted YAML dates in front matter are no longer dropped from `metadata`. They are normalized to `YYYY-MM-DD`.
 
 ### Added
@@ -44,12 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Behavior:** raw `<details class="details">` keeps its `details` class. The class is dropped on other elements.
 - **Dependencies:** `hast-util-sanitize` is a direct dependency.
 - Legacy helpers (`featherdown/legacy`) get none of the new features (alerts, details, links, images, embeds, the new fence flags, `diff` lines). Their output changes only through:
-  - the bug fixes above (footnote ids and links, links to `{#custom}` heading ids now resolve, the footnotes heading leaves `toc`/`headings`, cleaner excerpts, Node Mermaid ids no longer triple-prefixed);
+  - the bug fixes above (footnote ids and links, author ids no longer duplicating footnote ids, links to `{#custom}` heading ids now resolve, the footnotes heading leaves `toc`/`headings`, cleaner excerpts, Node Mermaid ids no longer triple-prefixed, multi-line tokens split per line in highlighted / numbered fences);
   - manifest `width` / `height`, emitted when supplied;
   - raw `<details class="details">` keeping its class.
 - Option merging: `parse(md, { group: true })` now keeps the constructor's settings for that group instead of resetting them to defaults, and tuning a group disabled on the constructor (`code: false`, then `{ code: { lineNumbers: true } }`) keeps it disabled unless `enabled: true` is passed.
-
-### Known limitations
-
-- An author heading or raw element whose id is `fn-1` / `fnref-1` (for example `## Top {#fn-1}`) produces an id that duplicates the matching footnote id. Footnote links still target the footnote.
-- Syntax-highlight tokens that span several lines (block comments, template literals) still merge those lines in the line-wrapping stage, as before. In `diff` / `<lang> diff` blocks this can misalign added/removed classes and line numbers for the affected lines.

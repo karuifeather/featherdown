@@ -88,31 +88,32 @@ function ensureClassNameList(className: unknown): string[] {
   return [];
 }
 
-function splitCodeChildrenIntoLines(children: ElementContent[]): ElementContent[][] {
+/**
+ * Splits one node at its newlines into per-line fragments (always at least one).
+ * Elements whose text spans several lines (hljs block comments, template
+ * literals) are cloned around each fragment so every line keeps its token
+ * classes and no wrapper crosses a line boundary.
+ */
+function splitNodeIntoLines(node: ElementContent): ElementContent[][] {
+  if (node.type === 'text') {
+    return node.value.split('\n').map((segment) => (segment.length > 0 ? [{ type: 'text', value: segment }] : []));
+  }
+  if (node.type !== 'element') return [[node]];
+
+  const inner = splitChildrenIntoLines(node.children);
+  if (inner.length === 1) return [[node]];
+  return inner.map((children) =>
+    children.length > 0 ? [{ ...node, properties: { ...node.properties }, children }] : [],
+  );
+}
+
+function splitChildrenIntoLines(children: ElementContent[]): ElementContent[][] {
   const lines: ElementContent[][] = [[]];
   for (const child of children) {
-    if (child.type !== 'text') {
-      const current = lines[lines.length - 1];
-      if (!current) {
-        continue;
-      }
-      current.push(child);
-      continue;
-    }
-
-    const segments = child.value.split('\n');
-    for (let i = 0; i < segments.length; i += 1) {
-      const segment = segments[i];
-      if (segment && segment.length > 0) {
-        const current = lines[lines.length - 1];
-        if (!current) {
-          continue;
-        }
-        current.push({ type: 'text', value: segment });
-      }
-      if (i < segments.length - 1) {
-        lines.push([]);
-      }
+    const fragments = splitNodeIntoLines(child);
+    for (let i = 0; i < fragments.length; i += 1) {
+      if (i > 0) lines.push([]);
+      lines[lines.length - 1]?.push(...(fragments[i] ?? []));
     }
   }
   return lines;
@@ -161,7 +162,7 @@ const rehypeCodeLineHighlights: Plugin<[], Root> = function rehypeCodeLineHighli
         node.properties.className = classNames;
       }
 
-      const splitLines = splitCodeChildrenIntoLines(node.children);
+      const splitLines = splitChildrenIntoLines(node.children);
       const lastLine = splitLines[splitLines.length - 1];
       const hasTrailingNewline = splitLines.length > 0 && !!lastLine && isEmptyLine(lastLine);
       const contentLines = hasTrailingNewline ? splitLines.slice(0, -1) : splitLines;

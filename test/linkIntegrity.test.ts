@@ -121,3 +121,22 @@ describe('footnote links beat colliding author ids', () => {
     expect(html).toContain('href="#user-content-fnref-1"');
   });
 });
+
+describe('author ids colliding with footnote ids', () => {
+  it('renames a custom heading id that would duplicate a footnote id', async () => {
+    const r = await new Featherdown().parse('## Top {#fn-1}\n\nText[^1]\n\n[^1]: note\n');
+    const ids = [...r.html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(r.html).toContain('<li id="user-content-fn-1">');
+    expect(r.html).toMatch(/<h2 id="user-content-fn-1-1"/);
+    expect(r.toc[0]?.id).toBe('user-content-fn-1-1');
+    expect(r.html).toMatch(/<a href="#user-content-fn-1"[^>]*data-footnote-ref/);
+  });
+
+  it('renames raw elements colliding with fnref ids', async () => {
+    const { html } = await new Featherdown().parse('<div id="fnref-1">x</div>\n\nText[^1]\n\n[^1]: note\n');
+    expect(html).toContain('id="user-content-fnref-1-1"');
+    expect(html).toContain('href="#user-content-fnref-1"');
+    expect(html.match(/id="user-content-fnref-1"/g)).toHaveLength(1);
+  });
+});

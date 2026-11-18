@@ -186,3 +186,19 @@ describe('line features without syntax highlighting', () => {
     expect(numbered).toContain('<span class="code-line code-line-highlighted"><span class="code-line-number">2</span>b</span>');
   });
 });
+
+describe('multi-line highlight tokens', () => {
+  it('splits a block comment into one code-line per source line', async () => {
+    const out = await html(fence('ts {2}', '/* one', '   two */', 'const x = 1;'), { lineNumbers: true });
+    const lines = out.match(/<span class="code-line(?: [^"]*)?">/g) ?? [];
+    expect(lines).toHaveLength(3);
+    expect(out).toMatch(/<span class="code-line code-line-highlighted"><span class="code-line-number">2<\/span><span class="hljs-comment"> {3}two \*\/<\/span><\/span>/);
+    expect(out).toMatch(/<span class="hljs-comment">\/\* one<\/span><\/span>\n/);
+  });
+
+  it('keeps diff markers aligned with lines after a multi-line token', async () => {
+    const out = await html(fence('ts diff', ' /* a', ' b */', '+added', '-removed'));
+    expect(out).toMatch(/<span class="code-line code-line-added">[^\n]*added/);
+    expect(out).toMatch(/<span class="code-line code-line-removed">[^\n]*removed/);
+  });
+});

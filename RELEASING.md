@@ -10,7 +10,7 @@ The [CI workflow](.github/workflows/ci.yml) runs on every push and pull request.
 - installs Playwright Chromium (`npx playwright install --with-deps chromium`) so Mermaid-related tests can run
 - runs `npm run build`, `npm test`, `npm run lint`, `npm run typecheck`, `npm run test:exports`, and `npm pack --dry-run`
 
-Node.js 22 is used in CI (the package requires Node.js 18 or newer).
+CI runs on Node.js 22 and 24 (the package requires Node.js 22 or newer).
 
 ## Release trigger
 
@@ -51,7 +51,7 @@ Action runtime deprecation notices in the job log are separate from publish fail
 
 JSR publishing from GitHub Actions uses OIDC (`id-token: write`). Do not add a `JSR_TOKEN` secret when using this linked flow.
 
-The JSR surface is defined only in `deno.json` exports (browser-safe / default library API). The npm-only `featherdown/node` Mermaid subpath remains outside JSR; that boundary is unchanged.
+The JSR surface is defined in `deno.json` exports and mirrors the npm JavaScript entries (`.`, `/node`, `/advanced`, `/legacy`); `test/jsrExportsParity.test.ts` enforces this. CSS subpaths are npm-only.
 
 ## Release procedure
 

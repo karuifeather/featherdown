@@ -231,6 +231,16 @@
   color: var(--fd-color-heading);
 }
 
+.featherdown-content .callout-title + *,
+.featherdown-content .callout > :first-child:not(.callout-title) {
+  margin-top: 0;
+}
+
+.featherdown-content .callout > :last-child,
+.featherdown-content .details > :last-child {
+  margin-bottom: 0;
+}
+
 .featherdown-content .callout-note,
 .featherdown-content .callout-info,
 .featherdown-content .callout-important {

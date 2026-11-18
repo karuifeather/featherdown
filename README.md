@@ -113,7 +113,7 @@ import "featherdown/styles/highlight.css"; // only when syntax highlighting is e
 - **`base.css`** — Prose/layout and structural contracts for rendered content.
 - **`katex.css`** — Bundler-oriented entry that pulls in KaTeX’s distribution CSS for math output.
 - **`code.css`** — Featherdown code-block shell / chrome (titles, line layout hooks, etc.).
-- **`highlight.css`** — Default highlight.js theme CSS; **include this only when syntax highlighting is enabled** (`code` with default highlighting, or equivalent).
+- **`highlight.css`** — Default syntax token colors (GitHub palette) for the `hljs-*` classes, with a dark palette that follows the same `data-theme` / `prefers-color-scheme` switching as `base.css`. Colors only: override `--fd-hl-*` variables or the `.hljs-*` classes. **Include this only when syntax highlighting is enabled** (`code` with default highlighting, or equivalent).
 
 Do **not** assume raw `<link href="node_modules/.../featherdown/styles.css">` without a bundler will resolve nested `@import`s the same way a bundler does.
 

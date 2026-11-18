@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import CodeMirror from "@uiw/react-codemirror";
+import CodeMirror, { EditorView } from "@uiw/react-codemirror";
 import { markdown as markdownLanguage } from "@codemirror/lang-markdown";
 import { Featherdown, type FeatherdownResult, type RenderDiagnostic } from "featherdown";
 
@@ -682,6 +682,8 @@ function FeatureDemo({ demo }: { demo: (typeof featureDemos)[number] }) {
 export default function App() {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === "undefined") return "light";
+    const forced = new URLSearchParams(window.location.search).get("theme");
+    if (forced === "light" || forced === "dark") return forced;
     try {
       const stored = window.localStorage.getItem("featherdown-site-theme");
       if (stored === "light" || stored === "dark") return stored;
@@ -691,6 +693,17 @@ export default function App() {
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
   const [markdown, setMarkdown] = useState(releasePresetMarkdown);
+  const [wrapLines, setWrapLines] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem("featherdown-site-wrap") !== "off";
+    } catch {
+      return true;
+    }
+  });
+  const editorExtensions = useMemo(
+    () => (wrapLines ? [markdownLanguage(), EditorView.lineWrapping] : [markdownLanguage()]),
+    [wrapLines],
+  );
   const [activeTab, setActiveTab] = useState<PlaygroundTab>("preview");
   const [activePreset, setActivePreset] = useState<PresetId>("release");
   const [result, setResult] = useState<FeatherdownResult | null>(null);
@@ -864,6 +877,18 @@ export default function App() {
       cancelled = true;
     };
   }, [activeTab, result?.html, theme]);
+
+  function toggleWrap() {
+    setWrapLines((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem("featherdown-site-wrap", next ? "on" : "off");
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+  }
 
   async function copyText(value: string) {
     try {
@@ -1041,12 +1066,17 @@ export default function App() {
               <h2>Playground</h2>
               <p>Edit on the left. Everything on the right comes from a single <code>parse()</code> call.</p>
             </div>
-            <div className="preset-row" role="group" aria-label="Presets">
-              {(Object.keys(presetMap) as PresetId[]).map((preset) => (
-                <button key={preset} className={activePreset === preset ? "chip active" : "chip"} onClick={() => applyPreset(preset)}>
-                  {presetMap[preset].label}
-                </button>
-              ))}
+            <div className="pg-toolbar">
+              <div className="preset-row" role="group" aria-label="Presets">
+                {(Object.keys(presetMap) as PresetId[]).map((preset) => (
+                  <button key={preset} className={activePreset === preset ? "chip active" : "chip"} onClick={() => applyPreset(preset)}>
+                    {presetMap[preset].label}
+                  </button>
+                ))}
+              </div>
+              <button type="button" className={wrapLines ? "chip active" : "chip"} role="switch" aria-checked={wrapLines} onClick={toggleWrap}>
+                Wrap lines: {wrapLines ? "on" : "off"}
+              </button>
             </div>
             <div className="playground">
               <div className="pg-pane">
@@ -1056,7 +1086,8 @@ export default function App() {
                     className="playground-codemirror"
                     value={markdown}
                     height="100%"
-                    extensions={[markdownLanguage()]}
+                    theme={theme}
+                    extensions={editorExtensions}
                     basicSetup={{ foldGutter: false, highlightActiveLine: false, highlightActiveLineGutter: false }}
                     onChange={(value) => setMarkdown(value)}
                     aria-label="Markdown editor"
@@ -1077,7 +1108,7 @@ export default function App() {
                 <div className="pg-output">
                   {errorMessage && <p className="error-message">{errorMessage}</p>}
                   {!errorMessage && activeTab === "preview" && (
-                    <div ref={previewRef} className="preview markdown-surface featherdown-content" dangerouslySetInnerHTML={{ __html: result?.html ?? "" }} />
+                    <div ref={previewRef} className={`preview markdown-surface featherdown-content${wrapLines ? " wrap-code" : ""}`} dangerouslySetInnerHTML={{ __html: result?.html ?? "" }} />
                   )}
                   {!errorMessage && activeTab === "result" && (
                     <div className="result-pane">

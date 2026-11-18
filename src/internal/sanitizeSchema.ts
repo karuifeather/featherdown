@@ -152,8 +152,23 @@ export const schemaWithSvg: Schema = {
 /**
  * Author-content schema when embeds are enabled.
  *
- * SCAFFOLD: currently identical to {@link markdownSanitizeSchema}; the embeds
- * work adds a narrow `iframe` allowance here (host filtering happens in
- * `rehypeEmbeds`, which runs right after sanitize).
+ * Adds `iframe` with only `src`, `title`, `width` and `height`. Everything else
+ * (`srcdoc`, `style`, event handlers, `sandbox`, `allow`, ...) is stripped;
+ * Featherdown adds its own hardening attributes afterwards.
+ *
+ * Two limits of hast-util-sanitize mean this schema is NOT the real gate:
+ * `protocols` is keyed by attribute name for every tag (narrowing `src` to
+ * `https` here would also change `<img>`), and the default `'*'` attributes
+ * (`name`, `id`, `tabIndex`, ...) still apply to iframes. `rehypeEmbeds`, which
+ * runs right after this pass, enforces `https`, the per-parse host allowlist
+ * and URL shape, and rebuilds each iframe's attributes from a whitelist (it
+ * drops every iframe when the per-parse config is missing).
  */
-export const markdownSanitizeSchemaWithEmbeds: Schema = markdownSanitizeSchema;
+export const markdownSanitizeSchemaWithEmbeds: Schema = {
+  ...markdownSanitizeSchema,
+  tagNames: [...(markdownSanitizeSchema.tagNames ?? []), 'iframe'],
+  attributes: {
+    ...(markdownSanitizeSchema.attributes ?? {}),
+    iframe: ['src', 'title', 'width', 'height'],
+  },
+};

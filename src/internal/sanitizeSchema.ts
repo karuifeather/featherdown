@@ -42,6 +42,7 @@ export const markdownSanitizeSchema: Schema = {
       ['className', /^language-./, 'math-inline', 'math-display'],
       'dataCodeBlockTitle',
       'dataCodeCopyButton',
+      'dataCodeDiffLines',
       'dataCodeLineHighlights',
       'dataCodeLineNumbers',
     ],

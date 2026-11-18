@@ -71,3 +71,22 @@
   color: var(--fd-color-muted);
   user-select: none;
 }
+
+/* Diff lines: `diff` fences and ```ts diff``` meta. Subtle tints, +/- gutter when line-numbered. */
+.featherdown-content .code-line-added {
+  background: color-mix(in srgb, #2da44e 16%, transparent);
+}
+
+.featherdown-content .code-line-removed {
+  background: color-mix(in srgb, #cf222e 16%, transparent);
+}
+
+.featherdown-content .code-line-numbered .code-line-added .code-line-number::after {
+  content: '+';
+  margin-left: 0.4ch;
+}
+
+.featherdown-content .code-line-numbered .code-line-removed .code-line-number::after {
+  content: '-';
+  margin-left: 0.4ch;
+}

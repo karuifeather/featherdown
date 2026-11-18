@@ -22,6 +22,7 @@ import rehypeCdnImagesInternal from './rehypeCdnImagesInternal.js';
 import rehypeChartBlocksInternal from './rehypeChartBlocksInternal.js';
 import rehypeCodeBlockTitles from './rehypeCodeBlockTitles.js';
 import rehypeCodeLineHighlights from './rehypeCodeLineHighlights.js';
+import rehypeResolveClobberedHrefs from './rehypeResolveClobberedHrefs.js';
 import { remarkCallouts } from './remarkCallouts.js';
 import { remarkCodeBlockTitles } from './remarkCodeBlockTitles.js';
 import { markdownSanitizeSchema } from './sanitizeSchema.js';
@@ -101,7 +102,12 @@ export function createMarkdownProcessorInternal(options?: InternalProcessorOptio
     processor.use(remarkCodeBlockTitles);
   }
 
-  processor.use(remarkRehype, { allowDangerousHtml: true }).use(rehypeRaw);
+  // With sanitize on, the sanitizer clobber-prefixes ids itself; letting
+  // remark-rehype prefix footnote ids too would double them. Hrefs are
+  // re-pointed at the prefixed ids by rehypeResolveClobberedHrefs below.
+  processor
+    .use(remarkRehype, gates.sanitize ? { allowDangerousHtml: true, clobberPrefix: '' } : { allowDangerousHtml: true })
+    .use(rehypeRaw);
 
   if (gates.sanitize) {
     processor.use(rehypeSanitize, markdownSanitizeSchema);
@@ -144,6 +150,10 @@ export function createMarkdownProcessorInternal(options?: InternalProcessorOptio
     processor.use(rehypeCdnImagesInternal);
   } else {
     processor.use(rehypeCdnImagesInternal, options);
+  }
+
+  if (gates.sanitize) {
+    processor.use(rehypeResolveClobberedHrefs);
   }
 
   processor.use(rehypeStringify);

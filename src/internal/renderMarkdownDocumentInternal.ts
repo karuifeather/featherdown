@@ -1,5 +1,5 @@
 import { toText } from 'hast-util-to-text';
-import { EXIT, visit } from 'unist-util-visit';
+import { EXIT, SKIP, visit } from 'unist-util-visit';
 import { VFile } from 'vfile';
 import {
   ALL_FEATURES_ON,
@@ -16,7 +16,7 @@ import type {
   RenderMarkdownOptions,
   TocItem,
 } from '../types.js';
-import type { Element, Root as HastRoot } from 'hast';
+import type { Element, ElementContent, Root as HastRoot } from 'hast';
 
 const WORDS_PER_MINUTE = 200;
 
@@ -40,6 +40,33 @@ function isParagraphLikeTagName(tagName: string): tagName is ParagraphLikeTagNam
   return excerptTagNames.has(tagName as ParagraphLikeTagName);
 }
 
+/** GFM footnotes render into `<section data-footnotes>`; it is not article content for TOC/excerpt. */
+function isFootnotesSection(node: Element): boolean {
+  return node.tagName === 'section' && node.properties.dataFootnotes !== undefined;
+}
+
+/** Plain text of a node, ignoring footnote reference markers (`<a data-footnote-ref>`). */
+function excerptText(node: Element): string {
+  const parts: string[] = [];
+  const walk = (child: ElementContent): void => {
+    if (child.type === 'text') {
+      parts.push(child.value);
+    } else if (child.type === 'element') {
+      if (child.properties.dataFootnoteRef !== undefined) return;
+      if (child.tagName === 'br') {
+        parts.push(' ');
+        return;
+      }
+      child.children.forEach(walk);
+    }
+  };
+  node.children.forEach(walk);
+  return normalizeText(parts.join(''))
+    // Drop the gap left by removed inline content before punctuation ("and ." -> "and.").
+    .replace(/\s+([.,;:!?)])/g, '$1')
+    .replace(/\(\s+/g, '(');
+}
+
 function isCustomHeadingId(value: unknown): boolean {
   return value === true || value === 'true' || value === '';
 }
@@ -48,19 +75,22 @@ function extractHeadings(root: HastRoot): HeadingMetadata[] {
   const headings: HeadingMetadata[] = [];
 
   visit(root, 'element', (node) => {
+    if (isFootnotesSection(node)) {
+      return SKIP;
+    }
     const depth = getHeadingDepth(node.tagName);
     if (!depth) {
-      return;
+      return undefined;
     }
 
     const id = typeof node.properties.id === 'string' ? node.properties.id : '';
     if (!id) {
-      return;
+      return undefined;
     }
 
     const text = normalizeText(toText(node));
     if (!text) {
-      return;
+      return undefined;
     }
 
     headings.push({
@@ -71,6 +101,7 @@ function extractHeadings(root: HastRoot): HeadingMetadata[] {
       hasCustomId: isCustomHeadingId(node.properties.dataHeadingCustomId),
     });
     delete node.properties.dataHeadingCustomId;
+    return undefined;
   });
 
   return headings;
@@ -92,11 +123,15 @@ function extractExcerpt(root: HastRoot): string | null {
       return EXIT;
     }
 
+    if (isFootnotesSection(node)) {
+      return SKIP;
+    }
+
     if (!isParagraphLikeTagName(node.tagName)) {
       return;
     }
 
-    const text = normalizeText(toText(node));
+    const text = excerptText(node);
     if (!text) {
       return;
     }

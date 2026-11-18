@@ -12,9 +12,9 @@ export const CALLOUT_TYPES = [
   'caution',
   'important',
 ] as const;
-type SupportedCalloutType = (typeof CALLOUT_TYPES)[number];
+export type SupportedCalloutType = (typeof CALLOUT_TYPES)[number];
 
-const DEFAULT_TITLES: Record<SupportedCalloutType, string> = {
+export const DEFAULT_TITLES: Record<SupportedCalloutType, string> = {
   note: 'Note',
   tip: 'Tip',
   warning: 'Warning',
@@ -41,7 +41,7 @@ function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
-function createTitleNode(title: string): BlockContent {
+export function createTitleNode(title: string): BlockContent {
   return {
     type: 'paragraph',
     data: {
@@ -59,7 +59,7 @@ function toPlainMarkdownNodes(name: string, label: string | null | undefined, ch
   return [createMarkerParagraph(openMarker), ...children, createMarkerParagraph(':::')];
 }
 
-function extractDirectiveLabel(children: BlockContent[]): { label: string | null; bodyChildren: BlockContent[] } {
+export function extractDirectiveLabel(children: BlockContent[]): { label: string | null; bodyChildren: BlockContent[] } {
   const first = children[0];
   if (!first || first.type !== 'paragraph') {
     return { label: null, bodyChildren: children };

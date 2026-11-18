@@ -52,6 +52,8 @@ export const markdownSanitizeSchema: Schema = {
     h5: [...baseH5, 'dataHeadingCustomId'],
     h6: [...baseH6, 'dataHeadingCustomId'],
     div: [...baseDiv, ['className', ...calloutClassNames]],
+    // `:::details` output; `open` is already allowed globally by defaultSchema.
+    details: [...(baseAttrs.details ?? []), ['className', 'details']],
   },
 };
 

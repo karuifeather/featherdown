@@ -260,3 +260,22 @@
   min-height: 5.5rem;
   background: var(--fd-color-subtle);
 }
+
+/* ---- Details (:::details) ---- */
+.featherdown-content .details {
+  margin: 1rem 0;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--fd-color-border);
+  border-radius: 0.4rem;
+  background: var(--fd-color-subtle);
+}
+
+.featherdown-content .details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--fd-color-heading);
+}
+
+.featherdown-content .details[open] > summary {
+  margin-bottom: 0.5rem;
+}

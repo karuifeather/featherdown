@@ -48,3 +48,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - manifest `width` / `height`, emitted when supplied;
   - raw `<details class="details">` keeping its class.
 - Option merging: `parse(md, { group: true })` now keeps the constructor's settings for that group instead of resetting them to defaults, and tuning a group disabled on the constructor (`code: false`, then `{ code: { lineNumbers: true } }`) keeps it disabled unless `enabled: true` is passed.
+
+### Known limitations
+
+- An author heading or raw element whose id is `fn-1` / `fnref-1` (for example `## Top {#fn-1}`) produces an id that duplicates the matching footnote id. Footnote links still target the footnote.
+- Syntax-highlight tokens that span several lines (block comments, template literals) still merge those lines in the line-wrapping stage, as before. In `diff` / `<lang> diff` blocks this can misalign added/removed classes and line numbers for the affected lines.

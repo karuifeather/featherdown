@@ -28,10 +28,12 @@ function figureParts(p: Element): { img: Element; root: Element } | undefined {
   if (kids.length !== 1) return undefined;
   const only = kids[0];
   if (!only) return undefined;
-  if (isImg(only)) return { img: only, root: only };
-  if (only.type === 'element' && only.tagName === 'a') {
+  if (only.type !== 'element') return undefined;
+  if (only.tagName === 'img') return { img: only, root: only };
+  if (only.tagName === 'a') {
     const inner = meaningful(only);
-    if (inner.length === 1 && isImg(inner[0])) return { img: inner[0], root: only };
+    const img = inner[0];
+    if (inner.length === 1 && isImg(img)) return { img, root: only };
   }
   return undefined;
 }

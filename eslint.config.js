@@ -8,6 +8,7 @@ const configDir = dirname(fileURLToPath(import.meta.url));
 export default tseslint.config(
   {
     ignores: [
+      '.claude/**',
       'dist/**',
       'site/**',
       'eslint.config.js',

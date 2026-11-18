@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-18
+
 ### Fixed
 
 - Code line highlights `{n}`, line numbers and `diff` lines now work with `code: { highlighting: false }`.
@@ -30,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `headings.minDepth` and `headings.maxDepth` filter `toc` and `tocTree`. `headings` is unaffected.
 - `tocTree` result field: `toc` entries nested under the nearest shallower heading.
 - `assets.features.embeds` result flag.
+- Exported types for the new options and results: `FeatherdownLinkOptions`, `FeatherdownImageOptions`, `FeatherdownEmbedOptions`, `FeatherdownEmbedProvider`, `FeatherdownPlugins`, `TocTreeItem`.
 - Code: `code.lineNumbers` and `code.copyButton` global defaults (both `false`), with per-fence opt-outs `noLineNumbers` / `showLineNumbers=false` and `noCopyButton` / `showCopyButton=false`.
 - Code: `showLineNumbers=N` starts numbering at `N`.
 - Code: `diff` fences mark added and removed lines (`code-line-added`, `code-line-removed`). The `ts diff` meta form does the same for any language, with markers stripped and highlighting kept.

@@ -1108,7 +1108,7 @@ export default function App() {
                 <div className="pg-output">
                   {errorMessage && <p className="error-message">{errorMessage}</p>}
                   {!errorMessage && activeTab === "preview" && (
-                    <div ref={previewRef} className={`preview markdown-surface featherdown-content${wrapLines ? " wrap-code" : ""}`} dangerouslySetInnerHTML={{ __html: result?.html ?? "" }} />
+                    <div ref={previewRef} className="preview markdown-surface featherdown-content" dangerouslySetInnerHTML={{ __html: result?.html ?? "" }} />
                   )}
                   {!errorMessage && activeTab === "result" && (
                     <div className="result-pane">

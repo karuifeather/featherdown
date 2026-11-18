@@ -11,6 +11,7 @@ const repoRoot = join(__dirname, '..');
 const root = await import('../dist/index.js');
 const nodeOnly = await import('../dist/node.js');
 const advanced = await import('../dist/advanced.js');
+const legacy = await import('../dist/legacy.js');
 
 /** Primary public classes — root and node entries */
 assert.equal(typeof root.Featherdown, 'function');
@@ -102,6 +103,12 @@ const requiredNodeNamedExports = [
 ];
 for (const name of requiredNodeNamedExports) {
   assert.ok(name in nodeOnly && nodeOnly[name] !== undefined, `dist/node.js must export "${name}".`);
+}
+
+const requiredLegacyNamedExports = ['renderMarkdown', 'renderMarkdownDocument', 'renderMarkdownToHtml', 'parseMarkdownFile'];
+for (const name of requiredLegacyNamedExports) {
+  assert.equal(typeof legacy[name], 'function', `dist/legacy.js must export "${name}".`);
+  assert.equal(legacy[name], root[name], `featherdown/legacy "${name}" must be the same function as the root re-export.`);
 }
 
 const requiredAdvancedNamedExports = ['createMarkdownProcessor', 'rehypeChartBlocks', 'rehypeCdnImages'];

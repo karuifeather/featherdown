@@ -158,13 +158,11 @@ export type FeatherdownCodeOptions = {
 };
 
 /**
- * Heading-related metadata intent for {@link Featherdown}. Slug and anchor HTML
- * are still produced by the pipeline when enabled here; `toc` controls returned
- * table-of-contents metadata only in this slice.
+ * Heading metadata options for {@link Featherdown}. Heading ids and anchor links
+ * are always rendered; `toc: false` empties `result.toc` while keeping
+ * `result.headings`.
  */
 export type FeatherdownHeadingOptions = {
-  slugs?: boolean;
-  anchors?: boolean;
   toc?: boolean;
 };
 

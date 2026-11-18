@@ -27,7 +27,7 @@ describe('JSR / npm export parity', () => {
       .map(([subpath, target]) => [subpath, npmTargetToSource(target)] as const)
       .filter((pair): pair is readonly [string, string] => pair[1] !== undefined);
 
-    expect(jsSubpaths.map(([subpath]) => subpath)).toEqual(['.', './node', './advanced']);
+    expect(jsSubpaths.map(([subpath]) => subpath)).toEqual(['.', './node', './advanced', './legacy']);
     for (const [subpath, source] of jsSubpaths) {
       expect(deno[subpath], `deno.json exports["${subpath}"]`).toBe(source);
     }

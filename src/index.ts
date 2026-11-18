@@ -6,9 +6,14 @@
  *   const featherdown = new Featherdown()
  *   const result = await featherdown.parse(markdown)
  *
- * Legacy helper functions remain exported for compatibility.
+ * Legacy helper functions remain exported (deprecated) for compatibility and are
+ * also available from `featherdown/legacy`.
  * Advanced unified/processor APIs are also available from `featherdown/advanced`.
  */
+
+import { createMarkdownProcessor as createMarkdownProcessorImpl } from './createMarkdownProcessor.js';
+import { rehypeCdnImages as rehypeCdnImagesImpl } from './rehypeCdnImages.js';
+import { rehypeChartBlocks as rehypeChartBlocksImpl } from './rehypeChartBlocks.js';
 
 /** Primary document parsing and rendering API. */
 export { Featherdown } from './featherdown.js';
@@ -35,7 +40,8 @@ export type {
 export { libraryId } from './libraryId.js';
 
 /**
- * Legacy compatibility helpers.
+ * Legacy compatibility helpers. Also available from `featherdown/legacy`, which
+ * is where they will live once these root re-exports are removed.
  *
  * @deprecated Prefer `new Featherdown().parse(markdown)`.
  */
@@ -57,9 +63,16 @@ export { renderMarkdownToHtml } from './renderMarkdownToHtml.js';
 export { parseMarkdownFile } from './parseMarkdownFile.js';
 
 /**
- * Advanced/compatibility export.
- * Prefer importing low-level processor APIs from `featherdown/advanced`.
+ * @deprecated Import from `featherdown/advanced`; the root re-export will be removed.
  */
-export { createMarkdownProcessor } from './createMarkdownProcessor.js';
-export { rehypeChartBlocks } from './rehypeChartBlocks.js';
-export { rehypeCdnImages } from './rehypeCdnImages.js';
+export const createMarkdownProcessor: typeof createMarkdownProcessorImpl = createMarkdownProcessorImpl;
+
+/**
+ * @deprecated Import from `featherdown/advanced`; the root re-export will be removed.
+ */
+export const rehypeChartBlocks: typeof rehypeChartBlocksImpl = rehypeChartBlocksImpl;
+
+/**
+ * @deprecated Import from `featherdown/advanced`; the root re-export will be removed.
+ */
+export const rehypeCdnImages: typeof rehypeCdnImagesImpl = rehypeCdnImagesImpl;

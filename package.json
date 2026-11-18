@@ -30,6 +30,11 @@
       "import": "./dist/advanced.js",
       "default": "./dist/advanced.js"
     },
+    "./legacy": {
+      "types": "./dist/legacy.d.ts",
+      "import": "./dist/legacy.js",
+      "default": "./dist/legacy.js"
+    },
     "./styles.css": "./styles.css",
     "./styles/base.css": "./styles/base.css",
     "./styles/katex.css": "./styles/katex.css",

@@ -62,8 +62,6 @@ describe('Featherdown', () => {
       diagnostics: true,
       charts: true,
       headings: {
-        slugs: true,
-        anchors: true,
         toc: true,
       },
       publishing: {

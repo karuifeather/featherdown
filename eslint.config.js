@@ -42,7 +42,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/index.ts', 'src/advanced.ts'],
+    files: ['src/index.ts', 'src/advanced.ts', 'src/legacy.ts'],
     rules: {
       // Barrel files re-export compatibility APIs that carry their own @deprecated JSDoc.
       '@typescript-eslint/no-deprecated': 'off',

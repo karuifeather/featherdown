@@ -12,11 +12,11 @@ The default npm entry is **browser-safe**. Optional **Node-only** Mermaid (inlin
 npm install featherdown
 ```
 
-Node.js **18+** is required.
+Node.js **22+** is required.
 
 ### JSR / Deno
 
-You can import the library from JSR (see [@karuifeather/featherdown](https://jsr.io/@karuifeather/featherdown)). **npm** publishes **CSS subpath exports** (`featherdown/styles.css`, `featherdown/styles/base.css`, and the other `featherdown/styles/*` entries in `package.json`). **Deno/JSR** (`deno.json` exports) does **not** mirror those CSS paths today—**CSS parity for JSR is deferred**; treat stylesheet wiring as environment-specific. **CSS packaging and `@import` resolution for JSR/Deno consumers are not treated as equivalent to npm bundler workflows.** Prefer npm (or a bundler) when you want the documented CSS entry points without extra setup.
+You can import the library from JSR (see [@karuifeather/featherdown](https://jsr.io/@karuifeather/featherdown)). JSR exposes the same JavaScript entry points as npm: the root, **`/node`**, and **`/advanced`**. **npm** publishes **CSS subpath exports** (`featherdown/styles.css`, `featherdown/styles/base.css`, and the other `featherdown/styles/*` entries in `package.json`). **Deno/JSR** (`deno.json` exports) does **not** mirror those CSS paths today—**CSS parity for JSR is deferred**; treat stylesheet wiring as environment-specific. **CSS packaging and `@import` resolution for JSR/Deno consumers are not treated as equivalent to npm bundler workflows.** Prefer npm (or a bundler) when you want the documented CSS entry points without extra setup.
 
 ## Quick start
 
@@ -175,7 +175,7 @@ const featherdown = new Featherdown({
 - **`math`** — Toggle KaTeX HTML output for `$…$` / `$$…$$`.
 - **`code`** — Toggle code pipeline features; **`highlighting`** controls whether highlight.js classes and **`highlight.css`** are relevant.
 - **`frontmatter`** — `false`, `true`, or `"auto"`; controls whether leading YAML front matter is parsed and stripped from `body`.
-- **`sanitize`** — When enabled, output passes through `rehype-sanitize` with the package schema.
+- **`sanitize`** — When enabled, author content (Markdown and raw HTML) passes through `rehype-sanitize` with the package schema **before** Featherdown adds its own markup (KaTeX, code chrome, chart mounts, heading anchors). Raw HTML keeps safe tags and attributes but loses `style`, `<button>`, and any `class` other than `language-*` on `code` and the callout classes on `div`.
 - **`diagnostics`** — Controls whether warnings appear on the result and whether strict mode fails the parse.
   - **`false`** — `result.diagnostics` is always `[]` (issues may still be detected internally).
   - **`true`** or **`"warn"`** — Non-fatal diagnostics are returned on `result.diagnostics`; the parse does not throw.
@@ -204,7 +204,7 @@ try {
 - **`headings`** — Controls **`result.headings`** and **`result.toc`** (metadata extracted after render). Heading markup in **`html`** is unchanged; this option gates the arrays on the result.
   - **`false`** — **`result.headings`** and **`result.toc`** are both empty arrays.
   - **`true`** — Default heading metadata: both arrays are populated when rendered headings have ids.
-  - **Object** — Shape matches **`FeatherdownHeadingOptions`**: optional **`toc`**. When **`toc`** is **`false`**, **`result.toc`** is empty while **`result.headings`** can still be filled. Optional **`slugs`** and **`anchors`** are part of the public type and merge like other nested options; they do not toggle the Markdown processor in this release.
+  - **Object** — Shape matches **`FeatherdownHeadingOptions`**: optional **`toc`**. When **`toc`** is **`false`**, **`result.toc`** is empty while **`result.headings`** can still be filled. Heading ids and anchor links are always rendered.
 - **`publishing`** — Gates excerpt, word count, and reading-time fields on the result.
 
 **`kind`**, **`slug`**, and **`manifest`** (local `map` and optional `remote`) drive manifest-based image URL rewriting—the same shape supported historically on render helpers.
@@ -313,7 +313,7 @@ const result = await featherdown.parse(markdown);
 
 - Uses **`rehype-mermaid`** and may require the **optional Playwright / Chromium** peer setup (`playwright` + `npx playwright install chromium`). Failures can be **environment-sensitive** in CI.
 - Valid diagrams become inline **SVG** in `html`; **`result.assets.features.mermaid`** is **`true`** when this path is active.
-- The Node Mermaid pipeline uses a **final SVG-aware sanitize** step and does **not** match every rehype plugin order detail of the default browser pipeline—expect rare edge differences for exotic inputs.
+- The Node Mermaid pipeline is the default pipeline plus a Mermaid stage: author content gets the same strict sanitize pass, then Mermaid SVG output gets a second, **SVG-aware sanitize** pass. Non-Mermaid output matches the browser entry.
 
 The default **`featherdown`** entry remains Mermaid-free for bundle safety.
 
@@ -331,11 +331,17 @@ import {
 } from "featherdown/advanced";
 ```
 
-The same symbols remain re-exported from the **root** package for backward compatibility; prefer **`Featherdown`** for normal Markdown rendering.
+The same symbols are still re-exported from the **root** package, but those root re-exports are **deprecated** and will be removed in a future minor release—import them from **`featherdown/advanced`**.
 
-### Legacy function exports
+### Legacy function exports (`featherdown/legacy`)
 
-Older helpers (`renderMarkdownToHtml`, `renderMarkdown`, `renderMarkdownDocument`, `parseMarkdownFile`, `createMarkdownProcessor`, …) remain exported and marked **`@deprecated`**. They take **`RenderMarkdownOptions`**, not the full **`FeatherdownOptions`** surface (for example **`math`**, **`code`**, **`charts`**, **`frontmatter`**, and **`diagnostics: "strict"`** are **`Featherdown`** features). Prefer **`new Featherdown().parse()`** for new code.
+Older helpers (`renderMarkdownToHtml`, `renderMarkdown`, `renderMarkdownDocument`, `parseMarkdownFile`) live in **`featherdown/legacy`**:
+
+```ts
+import { renderMarkdownToHtml } from "featherdown/legacy";
+```
+
+They are still re-exported from the package root, marked **`@deprecated`**, for one more minor release; switch imports to **`featherdown/legacy`** (or migrate to **`Featherdown`**) before the root re-exports are removed. They take **`RenderMarkdownOptions`**, not the full **`FeatherdownOptions`** surface (for example **`math`**, **`code`**, **`charts`**, **`frontmatter`**, and **`diagnostics: "strict"`** are **`Featherdown`** features). Prefer **`new Featherdown().parse()`** for new code.
 
 ## Migration from legacy helpers
 
@@ -376,9 +382,10 @@ Rendered output uses stable classes including:
 
 ## Security and trust
 
-- Input is sanitized (`rehype-sanitize`); scripts are stripped in the default pipeline.
+- Input is sanitized (`rehype-sanitize`) before any Featherdown plugin runs, so only Featherdown's own output carries inline styles (KaTeX layout) or package classes. Raw HTML cannot set `style`, add arbitrary classes, or create buttons.
+- Scripts, event handlers, and `javascript:` URLs are stripped.
 - Prefer the **default** entry for untrusted user content.
-- The **Node Mermaid** path is better suited to **trusted** publishing inputs.
+- The **Node Mermaid** path sanitizes diagram SVG too, but Mermaid itself executes diagram source in headless Chromium; it is better suited to **trusted** publishing inputs.
 
 ## Runtime boundaries
 
@@ -387,8 +394,9 @@ Rendered output uses stable classes including:
 | **`featherdown`** | Browser-safe; no Mermaid / Playwright in the default bundle. |
 | **`featherdown/node`** | Node **`Featherdown`**, optional Mermaid SVG, **`parseFile`**. |
 | **`featherdown/advanced`** | Processor + rehype plugins for unified integrations. |
+| **`featherdown/legacy`** | Deprecated pre-`Featherdown` helper functions. |
 
-Mermaid is **npm subpath–oriented**; JSR usage focuses on the default library surface.
+`featherdown/node` (including Mermaid) is also available from JSR as `@karuifeather/featherdown/node`; Mermaid still needs the Playwright / Chromium setup.
 
 ### Client-side Mermaid previews
 

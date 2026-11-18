@@ -1,4 +1,5 @@
 import type { MarkdownProcessorFeatureGates } from './createMarkdownProcessorInternal.js';
+import type { PipelineFeatureConfig } from './pipelineContext.js';
 import type { ResolvedFeatherdownOptions } from './resolveFeatherdownOptions.js';
 import type { FeatherdownOptions, RenderMarkdownOptions } from '../types.js';
 
@@ -30,5 +31,19 @@ export function toProcessorGates(resolved: ResolvedFeatherdownOptions): Markdown
     codeHighlighting: resolved.code.enabled && resolved.code.highlighting,
     charts: resolved.charts,
     sanitize: resolved.sanitize,
+    alerts: resolved.alerts,
+    details: resolved.details,
+    links: resolved.links.enabled,
+    images: resolved.images.enabled,
+    embeds: resolved.embeds.enabled,
+  };
+}
+
+export function toPipelineFeatureConfig(resolved: ResolvedFeatherdownOptions): PipelineFeatureConfig {
+  return {
+    code: { lineNumbers: resolved.code.lineNumbers, copyButton: resolved.code.copyButton },
+    links: resolved.links,
+    images: resolved.images,
+    embeds: resolved.embeds,
   };
 }

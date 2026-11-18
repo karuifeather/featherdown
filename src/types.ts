@@ -1,9 +1,21 @@
+import type { PluggableList } from 'unified';
+
 /**
  * Shared public type definitions for featherdown rendering APIs.
  *
  * This module documents option and diagnostic shapes used by browser-safe
  * entrypoints.
  */
+
+/**
+ * Manifest entry for one image. `width` / `height` (intrinsic pixels), when
+ * present, are emitted on the `<img>` to prevent layout shift.
+ */
+export type ManifestImageEntry = {
+  url: string;
+  width?: number;
+  height?: number;
+};
 
 /**
  * Options for Markdown rendering and image URL rewriting.
@@ -24,11 +36,11 @@ export type RenderMarkdownOptions = {
     /**
      * Mapping for local path keys such as `post/my-slug/images/logo.png`.
      */
-    map?: Record<string, { url: string }>;
+    map?: Record<string, ManifestImageEntry>;
     /**
      * Mapping for remote source URLs that should be replaced.
      */
-    remote?: Record<string, { url: string }>;
+    remote?: Record<string, ManifestImageEntry>;
   };
 };
 
@@ -51,7 +63,7 @@ export type RenderDiagnostic = {
   /**
    * Pipeline component that emitted the diagnostic.
    */
-  source: 'chart' | 'images';
+  source: 'chart' | 'images' | 'embeds' | 'code' | 'links';
 };
 
 /**
@@ -146,14 +158,13 @@ export type FeatherdownMathOptions = {
 
 /**
  * Code block pipeline intent for {@link Featherdown}.
- *
- * `lineNumbers` and `copyButton` are normalized for future global defaults; per-fence
- * `showLineNumbers` / `showCopyButton` in Markdown are unchanged in this release.
  */
 export type FeatherdownCodeOptions = {
   enabled?: boolean;
   highlighting?: boolean;
+  /** Default `showLineNumbers` for every fence (a fence can still opt in itself). Default `false`. */
   lineNumbers?: boolean;
+  /** Default copy-button markup for every fence (a fence can still opt in itself). Default `false`. */
   copyButton?: boolean;
 };
 
@@ -164,6 +175,71 @@ export type FeatherdownCodeOptions = {
  */
 export type FeatherdownHeadingOptions = {
   toc?: boolean;
+  /** Shallowest heading level included in `toc` / `tocTree` (default 1). `headings` is unaffected. */
+  minDepth?: number;
+  /** Deepest heading level included in `toc` / `tocTree` (default 6). `headings` is unaffected. */
+  maxDepth?: number;
+};
+
+/**
+ * Nested table-of-contents node: headings nested under the nearest shallower heading.
+ */
+export type TocTreeItem = TocItem & {
+  children: TocTreeItem[];
+};
+
+/**
+ * External link handling. Applies to absolute `http(s)` links whose host is not
+ * in `internalHosts`.
+ */
+export type FeatherdownLinkOptions = {
+  /** `rel` for external links (default `"noopener noreferrer"`); `false` leaves `rel` alone. */
+  rel?: string | false;
+  /** `target` for external links (default `"_blank"`); `false` leaves `target` alone. */
+  target?: string | false;
+  /** Hostnames treated as internal (exact match, or `*.example.com` wildcards). */
+  internalHosts?: string[];
+};
+
+/**
+ * Image output options.
+ */
+export type FeatherdownImageOptions = {
+  /** Add `loading="lazy"` (default `true`). */
+  lazy?: boolean;
+  /** Add `decoding` (default `"async"`); `false` omits it. */
+  decoding?: 'async' | 'sync' | 'auto' | false;
+  /**
+   * Wrap a paragraph containing only one titled image in
+   * `<figure class="markdown-figure">` with a `<figcaption>` from the title (default `false`).
+   */
+  figure?: boolean;
+};
+
+/**
+ * Built-in embed providers for allowlisted `<iframe>`s and `::embed` directives.
+ */
+export type FeatherdownEmbedProvider = 'youtube' | 'vimeo' | 'codepen' | 'codesandbox' | 'stackblitz';
+
+/**
+ * Embed options. Iframes are dropped unless their `src` matches an allowed provider or host.
+ */
+export type FeatherdownEmbedOptions = {
+  /** Built-in providers to allow (default: all built-in providers). */
+  providers?: FeatherdownEmbedProvider[];
+  /** Extra `https` hostnames to allow (exact, or `*.example.com`). */
+  allowHosts?: string[];
+};
+
+/**
+ * Extra unified plugins. `remark` plugins run after Featherdown's remark stage
+ * and before HTML conversion, so their output is still sanitized. `rehype`
+ * plugins run after every Featherdown stage, right before serialization, and
+ * are **not** sanitized: treat them as trusted code.
+ */
+export type FeatherdownPlugins = {
+  remark?: PluggableList;
+  rehype?: PluggableList;
 };
 
 /**
@@ -186,6 +262,15 @@ export type FeatherdownMetadata = {
   status?: string;
   tags?: string[];
   author?: string;
+  /** `draft: true` in front matter (or `status: draft`). */
+  draft?: boolean;
+  categories?: string[];
+  /** Cover / social image (`image`, `cover`, or `ogImage`). */
+  image?: string;
+  canonical?: string;
+  slug?: string;
+  lang?: string;
+  keywords?: string[];
 };
 
 /**
@@ -210,6 +295,18 @@ export type FeatherdownOptions = RenderMarkdownOptions & {
   charts?: boolean;
   headings?: boolean | FeatherdownHeadingOptions;
   publishing?: boolean | FeatherdownPublishingOptions;
+  /** GitHub-style alerts (`> [!NOTE]`) rendered as callouts. Default `true`. */
+  alerts?: boolean;
+  /** `:::details[Summary]` collapsible sections. Default `true`. */
+  details?: boolean;
+  /** External link `rel` / `target`. Default `false` (opt in). */
+  links?: boolean | FeatherdownLinkOptions;
+  /** Lazy loading, decoding and figure captions. Default `false` (opt in). */
+  images?: boolean | FeatherdownImageOptions;
+  /** Allowlisted iframes and `::embed` directives. Default `false` (opt in). */
+  embeds?: boolean | FeatherdownEmbedOptions;
+  /** Extra remark / rehype plugins. */
+  plugins?: FeatherdownPlugins;
 };
 
 /**
@@ -238,6 +335,8 @@ export type FeatherdownResult = RenderMarkdownDocumentResult & {
    * Typed subset of front matter for common publishing fields.
    */
   metadata: FeatherdownMetadata;
+  /** Nested table of contents built from `toc` (empty when `toc` is empty). */
+  tocTree: TocTreeItem[];
   stats: {
     wordCount: number;
     readingTimeMinutes: number;
@@ -250,6 +349,7 @@ export type FeatherdownResult = RenderMarkdownDocumentResult & {
       code: boolean;
       charts: boolean;
       mermaid: boolean;
+      embeds: boolean;
     };
   };
 };

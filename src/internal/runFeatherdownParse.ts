@@ -2,7 +2,7 @@ import type { FeatherdownOptions, FeatherdownResult } from '../types.js';
 import { buildFeatherdownResult } from './buildFeatherdownResult.js';
 import { buildMetadataFromFrontmatter } from './buildMetadataFromFrontmatter.js';
 import type { MermaidPluginsFactory } from './createMarkdownProcessorInternal.js';
-import { pickRenderMarkdownOptions, toProcessorGates } from './featherdownParseHelpers.js';
+import { pickRenderMarkdownOptions, toPipelineFeatureConfig, toProcessorGates } from './featherdownParseHelpers.js';
 import { parseFrontmatter } from './parseFrontmatter.js';
 import { renderMarkdownDocumentInternal } from './renderMarkdownDocumentInternal.js';
 import { resolveFeatherdownOptions } from './resolveFeatherdownOptions.js';
@@ -26,7 +26,11 @@ export async function runFeatherdownParse(
     fm.body,
     legacy,
     toProcessorGates(resolvedOptions),
-    mermaidPlugins ? { mermaidPlugins } : undefined,
+    {
+      ...(mermaidPlugins ? { mermaidPlugins } : {}),
+      config: toPipelineFeatureConfig(resolvedOptions),
+      ...(resolvedOptions.plugins ? { plugins: resolvedOptions.plugins } : {}),
+    },
   );
 
   const result = buildFeatherdownResult({

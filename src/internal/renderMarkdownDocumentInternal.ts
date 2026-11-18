@@ -9,10 +9,11 @@ import {
   type MermaidPluginsFactory,
 } from './createMarkdownProcessorInternal.js';
 import { createDiagnosticCollector } from './diagnostics.js';
-import { setPipelineContext } from './pipelineContext.js';
+import { setPipelineContext, type PipelineFeatureConfig } from './pipelineContext.js';
 import type {
   HeadingMetadata,
   RenderMarkdownDocumentResult,
+  FeatherdownPlugins,
   RenderMarkdownOptions,
   TocItem,
 } from '../types.js';
@@ -160,6 +161,8 @@ function estimateReadingMinutes(wordCount: number): number {
 }
 
 const processorCache = new Map<string, MarkdownProcessor>();
+/** Processors for instances with user plugins, keyed by the plugins object. */
+const pluginProcessorCache = new WeakMap<FeatherdownPlugins, Map<string, MarkdownProcessor>>();
 
 function cacheKey(gates: MarkdownProcessorFeatureGates, mermaid: boolean): string {
   return [
@@ -169,6 +172,11 @@ function cacheKey(gates: MarkdownProcessorFeatureGates, mermaid: boolean): strin
     gates.codeHighlighting,
     gates.charts,
     gates.sanitize,
+    gates.alerts,
+    gates.details,
+    gates.links,
+    gates.images,
+    gates.embeds,
   ]
     .map((flag) => (flag ? '1' : '0'))
     .join('');
@@ -178,21 +186,34 @@ function cacheKey(gates: MarkdownProcessorFeatureGates, mermaid: boolean): strin
  * Return a frozen processor for these gates, building it once. Processors hold
  * no per-parse state (diagnostics and image options travel on the vfile), so a
  * cached instance is safe to share across sequential and concurrent parses.
+ * With user plugins the cache is keyed by the plugins object identity.
  */
 function getCachedProcessor(
   gates: MarkdownProcessorFeatureGates,
   mermaidPlugins: MermaidPluginsFactory | undefined,
+  plugins: FeatherdownPlugins | undefined,
 ): MarkdownProcessor {
   const key = cacheKey(gates, mermaidPlugins !== undefined);
-  let processor = processorCache.get(key);
+  const hasPlugins = Boolean(plugins?.remark?.length || plugins?.rehype?.length);
+  let cache = processorCache;
+  if (plugins && hasPlugins) {
+    let perPlugins = pluginProcessorCache.get(plugins);
+    if (!perPlugins) {
+      perPlugins = new Map();
+      pluginProcessorCache.set(plugins, perPlugins);
+    }
+    cache = perPlugins;
+  }
+  let processor = cache.get(key);
   if (!processor) {
     processor = createMarkdownProcessorInternal({
       features: gates,
       preserveHeadingCustomIdMarker: true,
       contextFromFile: true,
       ...(mermaidPlugins ? { mermaidPlugins } : {}),
+      ...(plugins && hasPlugins ? { plugins } : {}),
     }).freeze();
-    processorCache.set(key, processor);
+    cache.set(key, processor);
   }
   return processor;
 }
@@ -200,6 +221,10 @@ function getCachedProcessor(
 export type RenderDocumentPipelineOptions = {
   /** Node-only Mermaid stage; omit for the browser-safe pipeline. */
   mermaidPlugins?: MermaidPluginsFactory;
+  /** Per-parse feature configuration read by plugins from the vfile. */
+  config?: PipelineFeatureConfig;
+  /** User remark / rehype plugins. */
+  plugins?: FeatherdownPlugins;
 };
 
 /**
@@ -213,10 +238,18 @@ export async function renderMarkdownDocumentInternal(
   pipeline?: RenderDocumentPipelineOptions,
 ): Promise<RenderMarkdownDocumentResult> {
   const collector = createDiagnosticCollector();
-  const processor = getCachedProcessor(pipelineFeatures ?? ALL_FEATURES_ON, pipeline?.mermaidPlugins);
+  const processor = getCachedProcessor(
+    pipelineFeatures ?? ALL_FEATURES_ON,
+    pipeline?.mermaidPlugins,
+    pipeline?.plugins,
+  );
 
   const file = new VFile(markdown);
-  setPipelineContext(file, { ...options, emitDiagnostic: collector.emit });
+  setPipelineContext(file, {
+    ...options,
+    emitDiagnostic: collector.emit,
+    ...(pipeline?.config ? { config: pipeline.config } : {}),
+  });
 
   const parsed = processor.parse(file);
   const root: HastRoot = await processor.run(parsed, file);

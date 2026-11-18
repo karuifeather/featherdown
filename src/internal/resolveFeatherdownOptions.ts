@@ -1,12 +1,25 @@
 import type {
   FeatherdownCodeOptions,
+  FeatherdownEmbedOptions,
+  FeatherdownEmbedProvider,
   FeatherdownHeadingOptions,
+  FeatherdownImageOptions,
+  FeatherdownLinkOptions,
   FeatherdownMathOptions,
   FeatherdownOptions,
   FeatherdownParseOptions,
+  FeatherdownPlugins,
   FeatherdownPublishingOptions,
   RenderMarkdownOptions,
 } from '../types.js';
+
+export const EMBED_PROVIDERS: readonly FeatherdownEmbedProvider[] = [
+  'youtube',
+  'vimeo',
+  'codepen',
+  'codesandbox',
+  'stackblitz',
+];
 
 /** Internal normalized options for {@link Featherdown} after merge + defaults. */
 export type ResolvedFeatherdownOptions = {
@@ -26,7 +39,29 @@ export type ResolvedFeatherdownOptions = {
   headings: {
     enabled: boolean;
     toc: boolean;
+    minDepth: number;
+    maxDepth: number;
   };
+  alerts: boolean;
+  details: boolean;
+  links: {
+    enabled: boolean;
+    rel: string | false;
+    target: string | false;
+    internalHosts: string[];
+  };
+  images: {
+    enabled: boolean;
+    lazy: boolean;
+    decoding: 'async' | 'sync' | 'auto' | false;
+    figure: boolean;
+  };
+  embeds: {
+    enabled: boolean;
+    providers: FeatherdownEmbedProvider[];
+    allowHosts: string[];
+  };
+  plugins?: FeatherdownPlugins;
   publishing: {
     excerpt: boolean;
     wordCount: boolean;
@@ -42,12 +77,26 @@ const DEFAULT_CODE: ResolvedFeatherdownOptions['code'] = {
   enabled: true,
   highlighting: true,
   lineNumbers: false,
-  copyButton: true,
+  copyButton: false,
 };
 
 const DEFAULT_HEADINGS: ResolvedFeatherdownOptions['headings'] = {
   enabled: true,
   toc: true,
+  minDepth: 1,
+  maxDepth: 6,
+};
+
+const DEFAULT_LINKS: Omit<ResolvedFeatherdownOptions['links'], 'enabled'> = {
+  rel: 'noopener noreferrer',
+  target: '_blank',
+  internalHosts: [],
+};
+
+const DEFAULT_IMAGES: Omit<ResolvedFeatherdownOptions['images'], 'enabled'> = {
+  lazy: true,
+  decoding: 'async',
+  figure: false,
 };
 
 const DEFAULT_PUBLISHING: ResolvedFeatherdownOptions['publishing'] = {
@@ -56,58 +105,8 @@ const DEFAULT_PUBLISHING: ResolvedFeatherdownOptions['publishing'] = {
   readingTime: true,
 };
 
-function mergeFeatherdownMathGroup(
-  ctor?: boolean | FeatherdownMathOptions,
-  parse?: boolean | FeatherdownMathOptions,
-): boolean | FeatherdownMathOptions | undefined {
-  if (parse !== undefined) {
-    if (typeof parse === 'boolean') {
-      return parse;
-    }
-    if (ctor !== undefined && typeof ctor === 'object') {
-      return { ...ctor, ...parse };
-    }
-    return { ...parse };
-  }
-  return ctor;
-}
-
-function mergeFeatherdownCodeGroup(
-  ctor?: boolean | FeatherdownCodeOptions,
-  parse?: boolean | FeatherdownCodeOptions,
-): boolean | FeatherdownCodeOptions | undefined {
-  if (parse !== undefined) {
-    if (typeof parse === 'boolean') {
-      return parse;
-    }
-    if (ctor !== undefined && typeof ctor === 'object') {
-      return { ...ctor, ...parse };
-    }
-    return { ...parse };
-  }
-  return ctor;
-}
-
-function mergeFeatherdownHeadingsGroup(
-  ctor?: boolean | FeatherdownHeadingOptions,
-  parse?: boolean | FeatherdownHeadingOptions,
-): boolean | FeatherdownHeadingOptions | undefined {
-  if (parse !== undefined) {
-    if (typeof parse === 'boolean') {
-      return parse;
-    }
-    if (ctor !== undefined && typeof ctor === 'object') {
-      return { ...ctor, ...parse };
-    }
-    return { ...parse };
-  }
-  return ctor;
-}
-
-function mergeFeatherdownPublishingGroup(
-  ctor?: boolean | FeatherdownPublishingOptions,
-  parse?: boolean | FeatherdownPublishingOptions,
-): boolean | FeatherdownPublishingOptions | undefined {
+/** One-level merge of a `boolean | object` option group; parse wins. */
+function mergeGroup<T extends object>(ctor?: boolean | T, parse?: boolean | T): boolean | T | undefined {
   if (parse !== undefined) {
     if (typeof parse === 'boolean') {
       return parse;
@@ -122,8 +121,9 @@ function mergeFeatherdownPublishingGroup(
 
 /**
  * Shallow-merge constructor and per-call options (parse wins on key conflicts).
- * Nested groups (math, code, headings, publishing) use a one-level object merge
- * when both sides supply objects.
+ * Nested groups (math, code, headings, publishing, links, images, embeds) use a
+ * one-level object merge when both sides supply objects. Plugin lists concatenate
+ * (constructor plugins first).
  */
 export function mergeFeatherdownOptions(
   constructorOptions?: FeatherdownOptions,
@@ -134,24 +134,23 @@ export function mergeFeatherdownOptions(
   }
   const out: FeatherdownOptions = { ...constructorOptions, ...parseOptions };
 
-  const mathMerged = mergeFeatherdownMathGroup(constructorOptions?.math, parseOptions?.math);
-  if (mathMerged !== undefined) {
-    out.math = mathMerged;
+  const groups = ['math', 'code', 'headings', 'publishing', 'links', 'images', 'embeds'] as const;
+  for (const key of groups) {
+    const merged = mergeGroup<object>(constructorOptions?.[key], parseOptions?.[key]);
+    if (merged !== undefined) {
+      (out as Record<string, unknown>)[key] = merged;
+    }
   }
 
-  const codeMerged = mergeFeatherdownCodeGroup(constructorOptions?.code, parseOptions?.code);
-  if (codeMerged !== undefined) {
-    out.code = codeMerged;
-  }
-
-  const headingsMerged = mergeFeatherdownHeadingsGroup(constructorOptions?.headings, parseOptions?.headings);
-  if (headingsMerged !== undefined) {
-    out.headings = headingsMerged;
-  }
-
-  const publishingMerged = mergeFeatherdownPublishingGroup(constructorOptions?.publishing, parseOptions?.publishing);
-  if (publishingMerged !== undefined) {
-    out.publishing = publishingMerged;
+  if (constructorOptions?.plugins || parseOptions?.plugins) {
+    const remark = [...(constructorOptions?.plugins?.remark ?? []), ...(parseOptions?.plugins?.remark ?? [])];
+    const rehype = [...(constructorOptions?.plugins?.rehype ?? []), ...(parseOptions?.plugins?.rehype ?? [])];
+    // Keep the constructor's object identity when the parse call adds nothing,
+    // so the processor cache can reuse the instance's processor.
+    out.plugins =
+      parseOptions?.plugins === undefined && constructorOptions?.plugins
+        ? constructorOptions.plugins
+        : { remark, rehype };
   }
 
   return out;
@@ -202,16 +201,66 @@ function normalizeHeadings(
   }
   if (typeof value === 'boolean') {
     if (!value) {
-      return {
-        enabled: false,
-        toc: false,
-      };
+      return { ...DEFAULT_HEADINGS, enabled: false, toc: false };
     }
     return { ...DEFAULT_HEADINGS };
   }
   return {
     enabled: true,
     toc: value.toc ?? base.toc,
+    minDepth: clampDepth(value.minDepth, base.minDepth),
+    maxDepth: clampDepth(value.maxDepth, base.maxDepth),
+  };
+}
+
+function clampDepth(value: number | undefined, fallback: number): number {
+  if (value === undefined || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.min(6, Math.max(1, Math.trunc(value)));
+}
+
+function normalizeLinks(value: boolean | FeatherdownLinkOptions | undefined): ResolvedFeatherdownOptions['links'] {
+  if (value === undefined || value === false) {
+    return { enabled: false, ...DEFAULT_LINKS };
+  }
+  if (value === true) {
+    return { enabled: true, ...DEFAULT_LINKS };
+  }
+  return {
+    enabled: true,
+    rel: value.rel ?? DEFAULT_LINKS.rel,
+    target: value.target ?? DEFAULT_LINKS.target,
+    internalHosts: value.internalHosts ?? DEFAULT_LINKS.internalHosts,
+  };
+}
+
+function normalizeImages(value: boolean | FeatherdownImageOptions | undefined): ResolvedFeatherdownOptions['images'] {
+  if (value === undefined || value === false) {
+    return { enabled: false, ...DEFAULT_IMAGES };
+  }
+  if (value === true) {
+    return { enabled: true, ...DEFAULT_IMAGES };
+  }
+  return {
+    enabled: true,
+    lazy: value.lazy ?? DEFAULT_IMAGES.lazy,
+    decoding: value.decoding ?? DEFAULT_IMAGES.decoding,
+    figure: value.figure ?? DEFAULT_IMAGES.figure,
+  };
+}
+
+function normalizeEmbeds(value: boolean | FeatherdownEmbedOptions | undefined): ResolvedFeatherdownOptions['embeds'] {
+  if (value === undefined || value === false) {
+    return { enabled: false, providers: [...EMBED_PROVIDERS], allowHosts: [] };
+  }
+  if (value === true) {
+    return { enabled: true, providers: [...EMBED_PROVIDERS], allowHosts: [] };
+  }
+  return {
+    enabled: true,
+    providers: (value.providers ?? [...EMBED_PROVIDERS]).filter((p) => EMBED_PROVIDERS.includes(p)),
+    allowHosts: value.allowHosts ?? [],
   };
 }
 
@@ -275,5 +324,11 @@ export function resolveFeatherdownOptions(raw?: FeatherdownOptions): ResolvedFea
     headings: normalizeHeadings(mergedNested.headings, DEFAULT_HEADINGS),
     publishing: normalizePublishing(mergedNested.publishing, DEFAULT_PUBLISHING),
     frontmatter: normalizeFrontmatter(mergedNested.frontmatter),
+    alerts: mergedNested.alerts ?? true,
+    details: mergedNested.details ?? true,
+    links: normalizeLinks(mergedNested.links),
+    images: normalizeImages(mergedNested.images),
+    embeds: normalizeEmbeds(mergedNested.embeds),
+    ...(mergedNested.plugins !== undefined ? { plugins: mergedNested.plugins } : {}),
   };
 }

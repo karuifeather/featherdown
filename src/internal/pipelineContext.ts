@@ -1,5 +1,17 @@
 import type { RenderMarkdownOptions } from '../types.js';
 import type { DiagnosticEmitter } from './diagnostics.js';
+import type { ResolvedFeatherdownOptions } from './resolveFeatherdownOptions.js';
+
+/**
+ * Per-parse feature configuration for plugins. Absent for legacy helpers, so
+ * every plugin must treat a missing field as "feature defaults off".
+ */
+export type PipelineFeatureConfig = {
+  code?: Pick<ResolvedFeatherdownOptions['code'], 'lineNumbers' | 'copyButton'>;
+  links?: ResolvedFeatherdownOptions['links'];
+  images?: ResolvedFeatherdownOptions['images'];
+  embeds?: ResolvedFeatherdownOptions['embeds'];
+};
 
 /**
  * Per-parse state that plugins read from the vfile instead of from plugin
@@ -8,6 +20,7 @@ import type { DiagnosticEmitter } from './diagnostics.js';
  */
 export type PipelineContext = RenderMarkdownOptions & {
   emitDiagnostic?: DiagnosticEmitter;
+  config?: PipelineFeatureConfig;
 };
 
 const KEY = 'featherdown';

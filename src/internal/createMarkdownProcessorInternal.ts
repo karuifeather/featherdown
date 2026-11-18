@@ -15,7 +15,7 @@ import type { Root as MdastRoot } from 'mdast';
 import type { PluggableList, Processor } from 'unified';
 import { unified } from 'unified';
 import { visit } from 'unist-util-visit';
-import type { RenderMarkdownOptions } from '../types.js';
+import type { FeatherdownPlugins, RenderMarkdownOptions } from '../types.js';
 import type { DiagnosticEmitter } from './diagnostics.js';
 import { remarkHeadingIds } from './headingIdsRemark.js';
 import rehypeCdnImagesInternal from './rehypeCdnImagesInternal.js';
@@ -25,7 +25,13 @@ import rehypeCodeLineHighlights from './rehypeCodeLineHighlights.js';
 import rehypeResolveClobberedHrefs from './rehypeResolveClobberedHrefs.js';
 import { remarkCallouts } from './remarkCallouts.js';
 import { remarkCodeBlockTitles } from './remarkCodeBlockTitles.js';
-import { markdownSanitizeSchema } from './sanitizeSchema.js';
+import rehypeEmbeds from './rehypeEmbeds.js';
+import rehypeImages from './rehypeImages.js';
+import rehypeLinks from './rehypeLinks.js';
+import remarkDetails from './remarkDetails.js';
+import remarkEmbeds from './remarkEmbeds.js';
+import remarkGithubAlerts from './remarkGithubAlerts.js';
+import { markdownSanitizeSchema, markdownSanitizeSchemaWithEmbeds } from './sanitizeSchema.js';
 
 /** Optional pipeline stages for {@link Featherdown}; omit for legacy all-on behavior. */
 export type MarkdownProcessorFeatureGates = {
@@ -34,6 +40,16 @@ export type MarkdownProcessorFeatureGates = {
   codeHighlighting: boolean;
   charts: boolean;
   sanitize: boolean;
+  /** GitHub alerts (`> [!NOTE]`). */
+  alerts: boolean;
+  /** `:::details` collapsibles. */
+  details: boolean;
+  /** External link attributes. */
+  links: boolean;
+  /** Image loading attributes / figures. */
+  images: boolean;
+  /** Allowlisted iframes and `::embed`. */
+  embeds: boolean;
 };
 
 /** Returns the Mermaid render (and post-render sanitize) stage for the given gates. */
@@ -56,6 +72,8 @@ export type InternalProcessorOptions = RenderMarkdownOptions & {
    * be cached and shared across parses.
    */
   contextFromFile?: boolean;
+  /** User plugins (see {@link FeatherdownPlugins}). */
+  plugins?: FeatherdownPlugins;
 };
 
 export const ALL_FEATURES_ON: MarkdownProcessorFeatureGates = {
@@ -64,6 +82,12 @@ export const ALL_FEATURES_ON: MarkdownProcessorFeatureGates = {
   codeHighlighting: true,
   charts: true,
   sanitize: true,
+  // Stages added after the legacy helpers froze their output stay off for them.
+  alerts: false,
+  details: false,
+  links: false,
+  images: false,
+  embeds: false,
 };
 
 function rehypeStripHeadingCustomIdMarker() {
@@ -96,10 +120,30 @@ export function createMarkdownProcessorInternal(options?: InternalProcessorOptio
     processor.use(remarkMath);
   }
 
-  processor.use(remarkHeadingIds).use(remarkCallouts);
+  processor.use(remarkHeadingIds);
+
+  // Directive-based stages must run before remarkCallouts, which turns any
+  // unrecognized container directive back into plain text.
+  if (gates.details) {
+    processor.use(remarkDetails);
+  }
+  if (gates.embeds) {
+    processor.use(remarkEmbeds);
+  }
+
+  processor.use(remarkCallouts);
+
+  if (gates.alerts) {
+    processor.use(remarkGithubAlerts);
+  }
 
   if (gates.code) {
     processor.use(remarkCodeBlockTitles);
+  }
+
+  // User remark plugins: their output is author content and is still sanitized.
+  if (options?.plugins?.remark?.length) {
+    processor.use(options.plugins.remark);
   }
 
   // With sanitize on, the sanitizer clobber-prefixes ids itself; letting
@@ -110,7 +154,12 @@ export function createMarkdownProcessorInternal(options?: InternalProcessorOptio
     .use(rehypeRaw);
 
   if (gates.sanitize) {
-    processor.use(rehypeSanitize, markdownSanitizeSchema);
+    processor.use(rehypeSanitize, gates.embeds ? markdownSanitizeSchemaWithEmbeds : markdownSanitizeSchema);
+  }
+
+  // Runs immediately after sanitize: removes non-allowlisted iframes.
+  if (gates.embeds) {
+    processor.use(rehypeEmbeds);
   }
 
   // Code chrome runs before Mermaid so titled / copyable Mermaid fences keep
@@ -152,8 +201,21 @@ export function createMarkdownProcessorInternal(options?: InternalProcessorOptio
     processor.use(rehypeCdnImagesInternal, options);
   }
 
+  if (gates.images) {
+    processor.use(rehypeImages);
+  }
+
+  if (gates.links) {
+    processor.use(rehypeLinks);
+  }
+
   if (gates.sanitize) {
     processor.use(rehypeResolveClobberedHrefs);
+  }
+
+  // User rehype plugins run last and are NOT sanitized: trusted code only.
+  if (options?.plugins?.rehype?.length) {
+    processor.use(options.plugins.rehype);
   }
 
   processor.use(rehypeStringify);

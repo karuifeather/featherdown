@@ -145,3 +145,12 @@ export const schemaWithSvg: Schema = {
     style: [],
   },
 };
+
+/**
+ * Author-content schema when embeds are enabled.
+ *
+ * SCAFFOLD: currently identical to {@link markdownSanitizeSchema}; the embeds
+ * work adds a narrow `iframe` allowance here (host filtering happens in
+ * `rehypeEmbeds`, which runs right after sanitize).
+ */
+export const markdownSanitizeSchemaWithEmbeds: Schema = markdownSanitizeSchema;

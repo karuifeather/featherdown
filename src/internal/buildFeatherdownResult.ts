@@ -1,4 +1,10 @@
-import type { FeatherdownMetadata, FeatherdownResult, RenderMarkdownDocumentResult } from '../types.js';
+import type {
+  FeatherdownMetadata,
+  FeatherdownResult,
+  RenderMarkdownDocumentResult,
+  TocItem,
+  TocTreeItem,
+} from '../types.js';
 import type { ResolvedFeatherdownOptions } from './resolveFeatherdownOptions.js';
 
 function buildStyleAssets(resolved: ResolvedFeatherdownOptions): string[] {
@@ -27,8 +33,32 @@ function buildAssets(
       code: resolved.code.enabled,
       charts: resolved.charts,
       mermaid: mermaidFeature,
+      embeds: resolved.embeds.enabled,
     },
   };
+}
+
+/**
+ * SCAFFOLD: nests a flat TOC under the nearest shallower heading. The
+ * headings/metadata work owns depth filtering and edge cases.
+ */
+export function buildTocTree(toc: TocItem[]): TocTreeItem[] {
+  const roots: TocTreeItem[] = [];
+  const stack: TocTreeItem[] = [];
+  for (const item of toc) {
+    const node: TocTreeItem = { ...item, children: [] };
+    while (stack.length > 0 && (stack[stack.length - 1]?.depth ?? 0) >= node.depth) {
+      stack.pop();
+    }
+    const parent = stack[stack.length - 1];
+    if (parent) {
+      parent.children.push(node);
+    } else {
+      roots.push(node);
+    }
+    stack.push(node);
+  }
+  return roots;
 }
 
 /**
@@ -87,6 +117,7 @@ export function buildFeatherdownResult(args: {
     body,
     frontmatter,
     metadata,
+    tocTree: buildTocTree(toc),
     stats: {
       wordCount,
       readingTimeMinutes: estimatedReadingMinutes,

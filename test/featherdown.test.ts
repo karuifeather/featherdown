@@ -47,6 +47,7 @@ describe('Featherdown', () => {
       code: true,
       charts: true,
       mermaid: false,
+      embeds: false,
     });
   });
 

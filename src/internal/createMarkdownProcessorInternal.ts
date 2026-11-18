@@ -22,6 +22,7 @@ import rehypeCdnImagesInternal from './rehypeCdnImagesInternal.js';
 import rehypeChartBlocksInternal from './rehypeChartBlocksInternal.js';
 import rehypeCodeBlockTitles from './rehypeCodeBlockTitles.js';
 import rehypeCodeLineHighlights from './rehypeCodeLineHighlights.js';
+import rehypeDedupeFootnoteIds from './rehypeDedupeFootnoteIds.js';
 import rehypeResolveClobberedHrefs from './rehypeResolveClobberedHrefs.js';
 import { remarkCallouts } from './remarkCallouts.js';
 import { remarkCodeBlockTitles } from './remarkCodeBlockTitles.js';
@@ -160,6 +161,11 @@ export function createMarkdownProcessorInternal(options?: InternalProcessorOptio
   // Runs immediately after sanitize: removes non-allowlisted iframes.
   if (gates.embeds) {
     processor.use(rehypeEmbeds);
+  }
+
+  // Before rehype-slug / autolink so heading anchors use the deduped id.
+  if (gates.sanitize) {
+    processor.use(rehypeDedupeFootnoteIds);
   }
 
   // Code chrome runs before Mermaid so titled / copyable Mermaid fences keep

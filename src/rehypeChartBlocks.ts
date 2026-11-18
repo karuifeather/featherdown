@@ -15,5 +15,5 @@ import rehypeChartBlocksInternal from './internal/rehypeChartBlocksInternal.js';
  * Invalid JSON leaves the original `<pre><code>` unchanged.
  */
 export const rehypeChartBlocks: Plugin<[], Root> =
-  rehypeChartBlocksInternal as unknown as Plugin<[], Root>;
+  rehypeChartBlocksInternal;
 

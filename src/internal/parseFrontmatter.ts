@@ -48,7 +48,7 @@ function extractFrontMatter(raw: string, yamlMode: 'strict' | 'lenient'): ParseF
         throw e;
       }
       const detail = e instanceof Error ? e.message : String(e);
-      throw new Error(`Front matter YAML could not be parsed: ${detail}`);
+      throw new Error(`Front matter YAML could not be parsed: ${detail}`, { cause: e });
     }
     return { body: raw, frontmatter: {}, hasFrontmatter: false };
   }

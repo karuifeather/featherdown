@@ -21,5 +21,5 @@ export type RehypeCdnImagesOptions = RenderMarkdownOptions;
  * caller-provided manifest data.
  */
 export const rehypeCdnImages: Plugin<[RehypeCdnImagesOptions?], Root> =
-  rehypeCdnImagesInternal as unknown as Plugin<[RehypeCdnImagesOptions?], Root>;
+  rehypeCdnImagesInternal;
 

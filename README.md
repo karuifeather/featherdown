@@ -437,7 +437,7 @@ Author-supplied `srcdoc`, event handlers, `style`, `name`, `id`, `class`, `sandb
 Rejected embeds produce non-fatal diagnostics on `result.diagnostics` with `source: "embeds"`:
 
 - **`embeds.blocked`** — A raw iframe or `::embed` URL did not match the allowlist, or an iframe had no `src`.
-- **`embeds.invalid`** — A directive had malformed input. Malformed directives may report either code.
+- **`embeds.invalid`** — A directive is missing required input or has a malformed id (for example `::youtube{id="bad"}` or `::embed{}`). A directive with a well-formed but disallowed `src` (such as `::embed{src="javascript:..."}`) reports **`embeds.blocked`**.
 
 With `diagnostics: "strict"`, any embed diagnostic makes `parse()` throw `FeatherdownDiagnosticsError`.
 

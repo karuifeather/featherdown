@@ -160,6 +160,49 @@ function estimateReadingMinutes(wordCount: number): number {
   return Math.max(1, Math.ceil(wordCount / WORDS_PER_MINUTE));
 }
 
+/** Features actually present in the rendered HAST (internal; never on public results). */
+export type DetectedFeatures = {
+  math: boolean;
+  code: boolean;
+  charts: boolean;
+  embeds: boolean;
+  mermaid: boolean;
+};
+
+function classNames(node: Element): string[] {
+  const value = node.properties.className;
+  if (Array.isArray(value)) return value.map(String);
+  return typeof value === 'string' ? value.split(/\s+/) : [];
+}
+
+/** Scans the final HAST for rendered KaTeX, code blocks, chart mounts, iframes and Mermaid SVG. */
+export function detectFeatures(root: HastRoot): DetectedFeatures {
+  const found: DetectedFeatures = { math: false, code: false, charts: false, embeds: false, mermaid: false };
+  visit(root, 'element', (node) => {
+    const classes = classNames(node);
+    if (classes.includes('katex') || classes.includes('katex-display')) {
+      found.math = true;
+    }
+    if (classes.includes('chart-mount')) {
+      found.charts = true;
+    }
+    if (node.tagName === 'pre' && node.children.some((c) => c.type === 'element' && c.tagName === 'code')) {
+      found.code = true;
+    }
+    if (node.tagName === 'iframe') {
+      found.embeds = true;
+    }
+    if (node.tagName === 'svg') {
+      const id = typeof node.properties.id === 'string' ? node.properties.id : '';
+      if (/^(user-content-)?mermaid/.test(id)) {
+        found.mermaid = true;
+      }
+    }
+    return undefined;
+  });
+  return found;
+}
+
 const processorCache = new Map<string, MarkdownProcessor>();
 /** Processors for instances with user plugins, keyed by the plugins object. */
 const pluginProcessorCache = new WeakMap<FeatherdownPlugins, Map<string, MarkdownProcessor>>();
@@ -237,6 +280,30 @@ export async function renderMarkdownDocumentInternal(
   pipelineFeatures?: MarkdownProcessorFeatureGates,
   pipeline?: RenderDocumentPipelineOptions,
 ): Promise<RenderMarkdownDocumentResult> {
+  const detailed = await renderMarkdownDocumentDetailed(markdown, options, pipelineFeatures, pipeline);
+  // Rebuild explicitly so internal-only fields never leak into legacy results.
+  return {
+    html: detailed.html,
+    diagnostics: detailed.diagnostics,
+    toc: detailed.toc,
+    headings: detailed.headings,
+    excerpt: detailed.excerpt,
+    wordCount: detailed.wordCount,
+    estimatedReadingMinutes: detailed.estimatedReadingMinutes,
+  };
+}
+
+/**
+ * Same as {@link renderMarkdownDocumentInternal} but also reports which
+ * features were actually rendered. Used by `Featherdown.parse()` only, so the
+ * legacy result shape is unchanged.
+ */
+export async function renderMarkdownDocumentDetailed(
+  markdown: string,
+  options?: RenderMarkdownOptions,
+  pipelineFeatures?: MarkdownProcessorFeatureGates,
+  pipeline?: RenderDocumentPipelineOptions,
+): Promise<RenderMarkdownDocumentResult & { detected: DetectedFeatures }> {
   const collector = createDiagnosticCollector();
   const processor = getCachedProcessor(
     pipelineFeatures ?? ALL_FEATURES_ON,
@@ -266,5 +333,6 @@ export async function renderMarkdownDocumentInternal(
     excerpt: extractExcerpt(root),
     wordCount,
     estimatedReadingMinutes: estimateReadingMinutes(wordCount),
+    detected: detectFeatures(root),
   };
 }

@@ -4,7 +4,7 @@ import { buildMetadataFromFrontmatter } from './buildMetadataFromFrontmatter.js'
 import type { MermaidPluginsFactory } from './createMarkdownProcessorInternal.js';
 import { pickRenderMarkdownOptions, toPipelineFeatureConfig, toProcessorGates } from './featherdownParseHelpers.js';
 import { parseFrontmatter } from './parseFrontmatter.js';
-import { renderMarkdownDocumentInternal } from './renderMarkdownDocumentInternal.js';
+import { renderMarkdownDocumentDetailed } from './renderMarkdownDocumentInternal.js';
 import { resolveFeatherdownOptions } from './resolveFeatherdownOptions.js';
 import { throwIfStrictDiagnosticsViolated } from './throwIfStrictDiagnosticsViolated.js';
 
@@ -22,7 +22,7 @@ export async function runFeatherdownParse(
 
   const fm = parseFrontmatter(markdown, resolvedOptions.frontmatter);
   const metadata = buildMetadataFromFrontmatter(fm.frontmatter);
-  const document = await renderMarkdownDocumentInternal(
+  const document = await renderMarkdownDocumentDetailed(
     fm.body,
     legacy,
     toProcessorGates(resolvedOptions),
@@ -38,6 +38,7 @@ export async function runFeatherdownParse(
     frontmatter: fm.frontmatter,
     metadata,
     document,
+    detected: document.detected,
     options: resolvedOptions,
     ...(mermaidPlugins ? { mermaidFeature: true } : {}),
   });

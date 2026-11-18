@@ -3,7 +3,7 @@ import CodeMirror from "@uiw/react-codemirror";
 import { markdown as markdownLanguage } from "@codemirror/lang-markdown";
 import { Featherdown, type FeatherdownResult, type RenderDiagnostic } from "featherdown";
 
-type PlaygroundTab = "preview" | "markdown" | "result" | "diagnostics" | "assets";
+type PlaygroundTab = "preview" | "result" | "diagnostics" | "assets";
 type PresetId = "release" | "technical" | "math" | "diagnostics";
 type Theme = "light" | "dark";
 
@@ -453,30 +453,159 @@ const defaultManifest = {
   },
 };
 
-const storyCards = [
-  {
-    title: "Metadata",
-    body: "Front matter becomes typed publishing metadata.",
-    sample: "result.metadata.title",
-  },
-  {
-    title: "Navigation",
-    body: "Headings and TOC come from the same parse.",
-    sample: "result.toc",
-  },
-  {
-    title: "Diagnostics",
-    body: "Warn in editors or fail builds with strict mode.",
-    sample: "result.diagnostics",
-  },
-  {
-    title: "Style assets",
-    body: "Know which exported CSS paths the rendered document needs.",
-    sample: "result.assets.styles",
-  },
-];
+
+type FeatherdownConfig = NonNullable<ConstructorParameters<typeof Featherdown>[0]>;
 
 const installSnippet = "npm install featherdown";
+
+const heroMarkdown = `---
+title: Shipping notes
+tags: [release, docs]
+---
+
+# Shipping notes
+
+Inline math works: $E = mc^2$.
+
+> [!TIP] Callouts
+> GitHub-style alerts render out of the box.
+
+## What changed
+
+\`\`\`ts title="parse.ts" {2}
+const result = await fd.parse(md);
+console.log(result.metadata.title);
+\`\`\`
+`;
+
+const heroCode = `import { Featherdown } from "featherdown";
+import "featherdown/styles.css";
+
+const fd = new Featherdown({ frontmatter: "auto", math: true });
+const result = await fd.parse(markdown);`;
+
+const diyImports = `import { unified } from "unified";
+import remarkParse from "remark-parse";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import remarkRehype from "remark-rehype";
+import rehypeSanitize from "rehype-sanitize";
+import rehypeSlug from "rehype-slug";
+import rehypeKatex from "rehype-katex";
+import rehypeHighlight from "rehype-highlight";
+import rehypeStringify from "rehype-stringify";
+import matter from "gray-matter";
+import readingTime from "reading-time";`;
+
+const diyBody = `const { data, content } = matter(source);
+
+const file = await unified()
+  .use(remarkParse)
+  .use(remarkGfm)
+  .use(remarkMath)
+  .use(remarkRehype)
+  .use(rehypeSanitize, myHandTunedSchema) // keep KaTeX + hljs classes alive
+  .use(rehypeSlug)
+  .use(rehypeKatex)
+  .use(rehypeHighlight)
+  .use(rehypeStringify)
+  .process(content);
+
+const html = String(file);
+const toc = buildToc(file);            // write it yourself
+const excerpt = buildExcerpt(html);    // write it yourself
+const stats = readingTime(content);
+const problems = lint(content);        // write it yourself`;
+
+const withCode = `import { Featherdown } from "featherdown";
+
+const fd = new Featherdown({ frontmatter: "auto", math: true });
+const result = await fd.parse(source);
+
+result.html          // sanitized, with math + highlighted code
+result.metadata      // typed front matter
+result.toc           // headings, ready for navigation
+result.excerpt       // plain-text summary
+result.stats         // word count + reading time
+result.diagnostics   // what went wrong, with codes
+result.assets.styles // which CSS this page needs`;
+
+type Cell = "built" | "plugin" | "diy";
+const cellLabel: Record<Cell, string> = { built: "Built in", plugin: "Plugin", diy: "Bring your own" };
+
+const comparisonRows: { feature: string; cells: [Cell, Cell, Cell, Cell] }[] = [
+  { feature: "Sanitized HTML by default", cells: ["built", "diy", "plugin", "plugin"] },
+  { feature: "Front matter → typed metadata", cells: ["built", "diy", "plugin", "plugin"] },
+  { feature: "TOC and heading data", cells: ["built", "diy", "plugin", "plugin"] },
+  { feature: "Excerpt and reading time", cells: ["built", "diy", "diy", "diy"] },
+  { feature: "Math (KaTeX)", cells: ["built", "plugin", "plugin", "plugin"] },
+  { feature: "Syntax highlighting", cells: ["built", "plugin", "plugin", "plugin"] },
+  { feature: "Callouts and GitHub alerts", cells: ["built", "plugin", "plugin", "plugin"] },
+  { feature: "Allowlisted embeds (YouTube, CodePen…)", cells: ["built", "diy", "diy", "diy"] },
+  { feature: "Diagnostics, strict mode for CI", cells: ["built", "diy", "diy", "diy"] },
+  { feature: "Which CSS this page needs", cells: ["built", "diy", "diy", "diy"] },
+];
+
+const featureDemos: {
+  title: string;
+  body: string;
+  source: string;
+  options?: FeatherdownConfig;
+  showDiagnostics?: boolean;
+}[] = [
+  {
+    title: "Alerts and callouts",
+    body: "GitHub alert syntax and :::directives share one set of callout classes.",
+    source: `> [!WARNING] Heads up
+> Migrations run **before** deploy.
+
+:::tip[Directive style]
+Same output, your choice of syntax.
+:::`,
+  },
+  {
+    title: "Collapsible sections",
+    body: "Native <details>, with callouts allowed inside.",
+    source: `:::details[Rollback steps]{open}
+1. Revert the release tag.
+2. Re-run the pipeline.
+:::`,
+  },
+  {
+    title: "Code that reads well",
+    body: "Titles, line highlights, line numbers and diff markers, from the fence line.",
+    source: `\`\`\`ts title="config.ts" {2} showLineNumbers
+const a = 1;
+const b = 2; // highlighted
+\`\`\``,
+    options: { code: true },
+  },
+  {
+    title: "Embeds without the risk",
+    body: "Opt in, and only allowlisted providers ever render. Everything else is dropped and reported.",
+    source: `::vimeo[Conference talk]{id="76979871"}
+
+::embed{src="https://evil.example/embed"}`,
+    options: { embeds: true },
+    showDiagnostics: true,
+  },
+  {
+    title: "Diagnostics you can act on",
+    body: "Bad chart JSON doesn't crash the page. It becomes a coded diagnostic. Use strict mode to fail the build.",
+    source: `\`\`\`chart-line
+{"labels":["A","B"],"datasets":[}
+\`\`\``,
+    showDiagnostics: true,
+  },
+  {
+    title: "Math and footnotes",
+    body: "KaTeX output and GFM footnotes with working links.",
+    source: `Euler[^1]: $e^{i\\pi} + 1 = 0$
+
+[^1]: Often called the most beautiful identity.`,
+    options: { math: true },
+  },
+];
 
 function encodeUtf8Base64(value: string): string {
   return btoa(
@@ -492,54 +621,100 @@ function decodeUtf8Base64(value: string): string {
   );
 }
 
-export default function App() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "light";
-    const stored = window.localStorage.getItem("featherdown-site-theme");
-    if (stored === "light" || stored === "dark") return stored;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  });
-  const [markdown, setMarkdown] = useState(releasePresetMarkdown);
-  const [activeTab, setActiveTab] = useState<PlaygroundTab>("result");
-  const [activePreset, setActivePreset] = useState<PresetId>("release");
+function useLiveParse(source: string, options: FeatherdownConfig) {
   const [result, setResult] = useState<FeatherdownResult | null>(null);
-  const featherdown = useMemo(
-    () =>
-      new Featherdown({
-        ...defaultManifest,
-        frontmatter: "auto",
-      }),
-    [],
-  );
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isRendering, setIsRendering] = useState(false);
-  const [installCopyLabel, setInstallCopyLabel] = useState("Copy install snippet");
-  const [heroCopyLabel, setHeroCopyLabel] = useState("Click to copy");
-  const [resetLabel, setResetLabel] = useState("Reset preset");
-  const previewRef = useRef<HTMLDivElement>(null);
-  const mermaidIdRef = useRef(0);
-
-  const diagnostics = result?.diagnostics ?? [];
-  const headingCount = result?.headings.length ?? 0;
-  const wordCount = result?.wordCount ?? 0;
-  const diagnosticCount = diagnostics.length;
-  const heroBadges = ["Browser-safe default", "Front matter metadata", "Strict diagnostics", "Explicit CSS", "Node build tools"];
-  const outputTabs: PlaygroundTab[] = ["result", "preview", "markdown", "diagnostics", "assets"];
-
+  const instance = useMemo(() => new Featherdown(options), [options]);
   useEffect(() => {
     let cancelled = false;
-    const params = new URLSearchParams(window.location.search);
-    const encoded = params.get("md");
-    if (!encoded) return;
-    try {
-      const decoded = decodeUtf8Base64(encoded);
-      if (!cancelled) setMarkdown(decoded);
-    } catch {
-      if (!cancelled) setErrorMessage("Could not decode URL state.");
-    }
+    instance
+      .parse(source)
+      .then((parsed) => {
+        if (!cancelled) setResult(parsed);
+      })
+      .catch(() => {
+        if (!cancelled) setResult(null);
+      });
     return () => {
       cancelled = true;
     };
+  }, [instance, source]);
+  return result;
+}
+
+const demoBaseOptions: FeatherdownConfig = { diagnostics: "warn" };
+
+function DiagnosticList({ items }: { items: RenderDiagnostic[] }) {
+  if (items.length === 0) return null;
+  return (
+    <ul className="diag-chips">
+      {items.map((item, idx) => (
+        <li key={`${item.code}-${idx}`}>
+          <code>{item.code}</code>
+          <span>{item.message}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function FeatureDemo({ demo }: { demo: (typeof featureDemos)[number] }) {
+  const options = useMemo<FeatherdownConfig>(() => ({ ...demoBaseOptions, ...demo.options }), [demo.options]);
+  const result = useLiveParse(demo.source, options);
+  return (
+    <article className="demo-card">
+      <h3>{demo.title}</h3>
+      <p>{demo.body}</p>
+      <div className="demo-io">
+        <div className="demo-pane">
+          <span className="pane-label">Markdown</span>
+          <pre><code>{demo.source}</code></pre>
+        </div>
+        <div className="demo-pane">
+          <span className="pane-label">Result</span>
+          <div className="featherdown-content demo-render" dangerouslySetInnerHTML={{ __html: result?.html ?? "" }} />
+          {demo.showDiagnostics && <DiagnosticList items={result?.diagnostics ?? []} />}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+export default function App() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "light";
+    try {
+      const stored = window.localStorage.getItem("featherdown-site-theme");
+      if (stored === "light" || stored === "dark") return stored;
+    } catch {
+      /* storage unavailable */
+    }
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
+  const [markdown, setMarkdown] = useState(releasePresetMarkdown);
+  const [activeTab, setActiveTab] = useState<PlaygroundTab>("preview");
+  const [activePreset, setActivePreset] = useState<PresetId>("release");
+  const [result, setResult] = useState<FeatherdownResult | null>(null);
+  const featherdown = useMemo(() => new Featherdown({ ...defaultManifest, frontmatter: "auto", math: true }), []);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isRendering, setIsRendering] = useState(false);
+  const [copyLabel, setCopyLabel] = useState("Copy");
+  const previewRef = useRef<HTMLDivElement>(null);
+  const mermaidIdRef = useRef(0);
+
+  const heroOptions = useMemo<FeatherdownConfig>(() => ({ frontmatter: "auto", math: true, diagnostics: "warn" }), []);
+  const heroResult = useLiveParse(heroMarkdown, heroOptions);
+
+  const diagnostics = result?.diagnostics ?? [];
+  const outputTabs: PlaygroundTab[] = ["preview", "result", "diagnostics", "assets"];
+
+  useEffect(() => {
+    const encoded = new URLSearchParams(window.location.search).get("md");
+    if (!encoded) return;
+    try {
+      setMarkdown(decodeUtf8Base64(encoded));
+    } catch {
+      setErrorMessage("Could not decode URL state.");
+    }
   }, []);
 
   useEffect(() => {
@@ -550,7 +725,11 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    window.localStorage.setItem("featherdown-site-theme", theme);
+    try {
+      window.localStorage.setItem("featherdown-site-theme", theme);
+    } catch {
+      /* storage unavailable */
+    }
   }, [theme]);
 
   useEffect(() => {
@@ -567,52 +746,53 @@ export default function App() {
         if (!cancelled) setIsRendering(false);
       }
     }
-    runRender();
+    void runRender();
     return () => {
       cancelled = true;
     };
   }, [markdown, featherdown]);
 
+  // Code-block copy buttons. Depends on activeTab so it re-binds when the preview mounts.
   useEffect(() => {
     if (activeTab !== "preview") return;
     const root = previewRef.current;
     if (!root) return;
-
     const onClick = async (event: MouseEvent) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
       const button = target.closest<HTMLButtonElement>("[data-code-copy]");
-      if (!button) return;
-      const copyTarget = button.getAttribute("data-code-copy-target");
-      if (!copyTarget) return;
+      const copyTarget = button?.getAttribute("data-code-copy-target");
+      if (!button || !copyTarget) return;
       const codeNode = root.querySelector<HTMLElement>(`[data-code-copy-target="${copyTarget}"]`);
-      if (!codeNode || !(codeNode instanceof HTMLElement)) return;
-      await navigator.clipboard.writeText(codeNode.innerText);
-      button.textContent = "Copied";
+      if (!codeNode) return;
+      try {
+        await navigator.clipboard.writeText(codeNode.innerText);
+        button.textContent = "Copied";
+      } catch {
+        button.textContent = "Failed";
+      }
       window.setTimeout(() => {
         button.textContent = "Copy";
       }, 1200);
     };
     root.addEventListener("click", onClick);
     return () => root.removeEventListener("click", onClick);
-  }, []);
+  }, [activeTab]);
 
   useEffect(() => {
+    if (activeTab !== "preview") return;
     const root = previewRef.current;
     if (!root) return;
-    const mounts = root.querySelectorAll<HTMLElement>(".chart-mount");
-    mounts.forEach((mount) => {
+    root.querySelectorAll<HTMLElement>(".chart-mount").forEach((mount) => {
       const rawType = String(mount.dataset.chart ?? "chart");
-      const rawData = String(mount.dataset.chartData ?? "{}");
       let labels = 0;
       let datasets = 0;
       try {
-        const parsed = JSON.parse(rawData) as { labels?: unknown[]; datasets?: unknown[] };
+        const parsed = JSON.parse(String(mount.dataset.chartData ?? "{}")) as { labels?: unknown[]; datasets?: unknown[] };
         labels = Array.isArray(parsed.labels) ? parsed.labels.length : 0;
         datasets = Array.isArray(parsed.datasets) ? parsed.datasets.length : 0;
       } catch {
-        labels = 0;
-        datasets = 0;
+        /* leave zeros */
       }
       mount.innerHTML = "";
       mount.classList.add("chart-placeholder");
@@ -628,7 +808,7 @@ export default function App() {
         bars.append(bar);
       }
       const hint = document.createElement("small");
-      hint.textContent = "Demo placeholder - hydrate with your chart runtime.";
+      hint.textContent = "Placeholder. Hydrate with your chart runtime.";
       mount.append(title, meta, bars, hint);
     });
   }, [activeTab, result?.html]);
@@ -636,21 +816,14 @@ export default function App() {
   useEffect(() => {
     if (activeTab !== "preview") return;
     if (!previewRef.current) return;
-
     let cancelled = false;
+    const selector = "pre code.language-mermaid, pre code[class*='language-mermaid']";
 
     async function hydrateMermaidBlocks() {
       const rootEl = previewRef.current;
       if (!rootEl) return;
-      const hasMermaidBlock = rootEl.querySelector(
-        ".code-block pre code.language-mermaid, .code-block pre code[class*='language-mermaid'], pre code.language-mermaid, pre code[class*='language-mermaid']",
-      );
-      if (!hasMermaidBlock) return;
-      const candidates = Array.from(
-        rootEl.querySelectorAll<HTMLElement>(
-          ".code-block pre code.language-mermaid, .code-block pre code[class*='language-mermaid'], pre code.language-mermaid, pre code[class*='language-mermaid']",
-        ),
-      );
+      const candidates = Array.from(rootEl.querySelectorAll<HTMLElement>(selector));
+      if (candidates.length === 0) return;
 
       let mermaidModule: { default: { initialize: (config: object) => void; render: (id: string, code: string) => Promise<{ svg: string }> } };
       try {
@@ -659,12 +832,7 @@ export default function App() {
         return;
       }
       if (cancelled) return;
-
-      mermaidModule.default.initialize({
-        startOnLoad: false,
-        securityLevel: "strict",
-        theme: theme === "dark" ? "dark" : "default",
-      });
+      mermaidModule.default.initialize({ startOnLoad: false, securityLevel: "strict", theme: theme === "dark" ? "dark" : "default" });
 
       for (const codeNode of candidates) {
         if (cancelled) break;
@@ -672,63 +840,39 @@ export default function App() {
         const source = codeNode.textContent?.trim();
         if (!source) continue;
         codeNode.dataset.mermaidHydrated = "true";
-
         const block = codeNode.closest<HTMLElement>(".code-block") ?? codeNode.closest<HTMLElement>("pre");
         if (!block) continue;
-
         try {
           mermaidIdRef.current += 1;
-          const renderId = `fd-mermaid-${mermaidIdRef.current}`;
-          const { svg } = await mermaidModule.default.render(renderId, source);
+          const { svg } = await mermaidModule.default.render(`fd-mermaid-${mermaidIdRef.current}`, source);
           if (cancelled) break;
-
           const wrapper = document.createElement("figure");
           wrapper.className = "mermaid-diagram-card";
           const body = document.createElement("div");
           body.className = "mermaid-diagram-body";
           body.innerHTML = svg;
-          const caption = document.createElement("figcaption");
-          caption.textContent = "Client-side Mermaid preview in demo.";
-          wrapper.append(body, caption);
+          wrapper.append(body);
           block.replaceWith(wrapper);
         } catch {
           block.classList.add("mermaid-source-fallback");
-          const note = document.createElement("p");
-          note.className = "mermaid-fallback-note";
-          note.textContent = "Mermaid preview failed. Showing source block.";
-          block.insertAdjacentElement("afterend", note);
         }
       }
     }
 
     void hydrateMermaidBlocks();
-
     return () => {
       cancelled = true;
     };
   }, [activeTab, result?.html, theme]);
 
-  const resultSummary = useMemo(() => {
-    if (!result) return null;
-    return {
-      metadata: result.metadata,
-      stats: result.stats,
-      tocItems: result.toc.length,
-      headingItems: result.headings.length,
-      excerpt: result.excerpt,
-      frontmatterKeys: Object.keys(result.frontmatter),
-    };
-  }, [result]);
-
-  async function copyTextWithFeedback(value: string, setLabel: (next: string) => void, successText: string, idleText: string) {
+  async function copyText(value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      setLabel(successText);
+      setCopyLabel("Copied");
     } catch {
-      setLabel("Copy failed");
-    } finally {
-      window.setTimeout(() => setLabel(idleText), 1100);
+      setCopyLabel("Copy failed");
     }
+    window.setTimeout(() => setCopyLabel("Copy"), 1200);
   }
 
   function applyPreset(preset: PresetId) {
@@ -736,390 +880,305 @@ export default function App() {
     setMarkdown(presetMap[preset].markdown);
   }
 
-  function resetPreset() {
-    setMarkdown(presetMap[activePreset].markdown);
-    setActiveTab("result");
-    setResetLabel("Example reset");
-    window.setTimeout(() => setResetLabel("Reset preset"), 1100);
-  }
+  const heroFeatures = Object.entries(heroResult?.assets.features ?? {})
+    .filter(([, on]) => Boolean(on))
+    .map(([name]) => name);
 
   return (
     <div className="app-shell">
-      <header className="hero">
-        <div className="container">
-          <div className="hero-layout">
-            <div className="hero-main">
-              <div className="hero-top-row">
-                <p className="eyebrow">featherdown</p>
-                <button className="theme-toggle" type="button" onClick={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}>
-                  {theme === "dark" ? "Light" : "Dark"}
-                </button>
-              </div>
-              <h1>Markdown in. Publishable content out.</h1>
-              <p className="hero-copy">
-                Featherdown turns one Markdown source into sanitized HTML, metadata, table-of-contents data, diagnostics, and style asset
-                hints - without making you wire a full unified pipeline.
-              </p>
-              <div className="hero-metrics" aria-label="Package highlights">
-                {heroBadges.map((badge) => (
-                  <span key={badge}>{badge}</span>
-                ))}
-              </div>
-              <div className="cta-row">
-                <button
-                  type="button"
-                  className="cta-primary cta-install"
-                  onClick={() => copyTextWithFeedback(installSnippet, setHeroCopyLabel, "Copied command", "Copy install")}
-                >
-                  npm install featherdown
-                </button>
-                <a className="cta-primary" href="#playground">Open playground</a>
-                <a href={githubUrl} target="_blank" rel="noreferrer">GitHub</a>
-              </div>
-              <p className="copy-hint">{heroCopyLabel}</p>
-            </div>
-            <aside className="hero-aside">
-              <p className="hero-aside-label">One parse transformation</p>
-              <p className="hero-proof-title">Markdown source</p>
-              <ul className="hero-proof-list">
-                <li>front matter</li>
-                <li>headings</li>
-                <li>code</li>
-                <li>charts</li>
-              </ul>
-              <p className="hero-arrow">→ FeatherdownResult</p>
-              <ul className="hero-proof-list">
-                <li>html</li>
-                <li>metadata</li>
-                <li>toc</li>
-                <li>diagnostics</li>
-                <li>assets.styles</li>
-              </ul>
-              <div className="hero-proof-stats" aria-label="Live render proof">
-                <article><span>Headings</span><strong>{headingCount}</strong></article>
-                <article><span>Word count</span><strong>{wordCount}</strong></article>
-                <article><span>Diagnostics</span><strong>{diagnosticCount}</strong></article>
-              </div>
-            </aside>
+      <nav className="topbar">
+        <div className="container topbar-inner">
+          <a className="brand" href="#top">featherdown</a>
+          <div className="topbar-links">
+            <a href="#compare">Compare</a>
+            <a href="#features">Features</a>
+            <a href="#playground">Playground</a>
+            <a href="#start">Get started</a>
+            <a href={githubUrl} target="_blank" rel="noreferrer">GitHub</a>
+            <button className="theme-toggle" type="button" onClick={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}>
+              {theme === "dark" ? "Light" : "Dark"}
+            </button>
           </div>
+        </div>
+      </nav>
+
+      <header id="top" className="hero">
+        <div className="container">
+          <div className="hero-copy-block">
+            <h1>One call. Everything a publishing page needs.</h1>
+            <p className="hero-sub">
+              Give featherdown Markdown. Get back sanitized HTML, typed metadata, a table of contents, an excerpt, reading time, diagnostics
+              and the CSS to load. No unified pipeline to wire, no plugin matrix to maintain.
+            </p>
+            <div className="cta-row">
+              <button type="button" className="install-pill" onClick={() => copyText(installSnippet)}>
+                <span className="prompt">$</span> {installSnippet}
+                <span className="copy-tag">{copyLabel}</span>
+              </button>
+              <a className="btn btn-primary" href="#playground">Try the playground</a>
+              <a className="btn" href="#compare">See how it compares</a>
+            </div>
+          </div>
+
+          <div className="hero-demo">
+            <div className="hero-col">
+              <span className="pane-label">Your code</span>
+              <pre className="code-surface"><code>{heroCode}</code></pre>
+              <span className="pane-label">Your Markdown</span>
+              <pre className="code-surface"><code>{heroMarkdown}</code></pre>
+            </div>
+            <div className="hero-arrow" aria-hidden="true">→</div>
+            <div className="hero-col">
+              <span className="pane-label">result.html</span>
+              <div className="featherdown-content hero-render" dangerouslySetInnerHTML={{ __html: heroResult?.html ?? "" }} />
+              <span className="pane-label">Plus, from the same parse</span>
+              <dl className="result-list">
+                <div><dt>metadata.title</dt><dd>{heroResult?.metadata.title ?? "…"}</dd></div>
+                <div><dt>metadata.tags</dt><dd>{heroResult?.metadata.tags?.join(", ") ?? "…"}</dd></div>
+                <div><dt>toc</dt><dd>{heroResult?.toc.map((t) => t.text).join(" · ") ?? "…"}</dd></div>
+                <div><dt>stats</dt><dd>{heroResult ? `${heroResult.stats.wordCount} words · ${heroResult.stats.readingTimeMinutes} min` : "…"}</dd></div>
+                <div><dt>diagnostics</dt><dd>{heroResult ? `${heroResult.diagnostics.length} issues` : "…"}</dd></div>
+                <div><dt>assets.features</dt><dd>{heroFeatures.join(", ") || "none"}</dd></div>
+              </dl>
+            </div>
+          </div>
+          <p className="hero-foot">This block is rendered live by the package, not a screenshot.</p>
         </div>
       </header>
 
       <main>
-        <section className="section muted-section">
-          <div className="container">
-            <div className="section-head">
-              <h2>More than Markdown to HTML</h2>
-              <p>Basic Markdown parsers stop at HTML. Featherdown gives publishing apps the document data they usually build by hand.</p>
-            </div>
-            <div className="feature-grid">
-              {storyCards.map((card) => (
-                <article key={card.title} className="feature-card">
-                  <h3>{card.title}</h3>
-                  <p>{card.body}</p>
-                  <pre><code>{card.sample}</code></pre>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
         <section className="section">
           <div className="container">
             <div className="section-head">
-              <h2>Quick start</h2>
-              <p>Install once, parse once, and ship HTML plus publishing data.</p>
+              <h2>The same job, with and without it</h2>
+              <p>
+                Rendering Markdown safely is easy. Getting HTML <em>and</em> the data around it is where a hand-built pipeline grows.
+              </p>
             </div>
-            <article className="feature-card feature-card-strong">
-              <pre className="quickstart-snippet"><code>{`npm install featherdown`}</code></pre>
-              <pre className="quickstart-snippet"><code>{`import { Featherdown } from "featherdown";
-import "featherdown/styles.css";
-
-const featherdown = new Featherdown({
-  frontmatter: "auto",
-});
-
-const result = await featherdown.parse(markdown);`}</code></pre>
-            </article>
+            <div className="versus">
+              <article className="versus-card versus-without">
+                <header>
+                  <h3>Hand-wired unified</h3>
+                  <span className="versus-stat">12 packages · 3 helpers you write</span>
+                </header>
+                <pre className="code-surface"><code>{diyImports}</code></pre>
+                <pre className="code-surface"><code>{diyBody}</code></pre>
+              </article>
+              <article className="versus-card versus-with">
+                <header>
+                  <h3>featherdown</h3>
+                  <span className="versus-stat">1 package · 0 helpers</span>
+                </header>
+                <pre className="code-surface"><code>{withCode}</code></pre>
+                <p className="versus-note">
+                  Sanitization runs <strong>before</strong> featherdown adds its own markup, so KaTeX and code chrome survive while hostile HTML does
+                  not. That ordering is easy to get wrong by hand.
+                </p>
+              </article>
+            </div>
           </div>
         </section>
 
-        <section className="section muted-section">
+        <section id="compare" className="section tint">
           <div className="container">
             <div className="section-head">
-              <h2>Style it your way</h2>
+              <h2>How it compares</h2>
               <p>
-                Featherdown ships CSS as explicit package exports, but it does not inject styles into your app. Start with the all-in
-                stylesheet, load only the pieces you need, or bring your own Markdown and code-block theme.
+                marked, markdown-it and remark are excellent parsers, and most of these gaps can be closed with extensions. featherdown's
+                point is that you don't have to close them yourself.
               </p>
             </div>
-            <div className="feature-grid style-grid">
-              <article className="feature-card">
-                <h3>Fastest setup</h3>
-                <pre><code>{`import "featherdown/styles.css";`}</code></pre>
-              </article>
-              <article className="feature-card">
-                <h3>Selective imports</h3>
-                <pre><code>{`import "featherdown/styles/base.css";
-import "featherdown/styles/katex.css";
-import "featherdown/styles/code.css";`}</code></pre>
-              </article>
-              <article className="feature-card">
-                <h3>Custom theme</h3>
-                <pre><code>{`// Keep Featherdown's baseline layout styles if you want them.
-import "featherdown/styles/base.css";
-
-import "./markdown-theme.css";
-import "./code-theme.css";`}</code></pre>
-                <p>Start from <code>base.css</code> and override it, or skip it and fully own rendered Markdown styles in your app.</p>
-                <p>Code highlighting uses highlight.js-style <code>hljs</code> token classes, so custom themes can target <code>.hljs-keyword</code>, <code>.hljs-string</code>, and <code>.hljs-comment</code>.</p>
-              </article>
+            <div className="table-wrap">
+              <table className="compare-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Out of the box</th>
+                    <th scope="col" className="col-us">featherdown</th>
+                    <th scope="col">marked</th>
+                    <th scope="col">markdown-it</th>
+                    <th scope="col">remark / unified</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisonRows.map((row) => (
+                    <tr key={row.feature}>
+                      <th scope="row">{row.feature}</th>
+                      {row.cells.map((cell, idx) => (
+                        <td key={idx} className={idx === 0 ? "col-us" : undefined}>
+                          <span className={`cell cell-${cell}`}>{cellLabel[cell]}</span>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <p className="style-note">
-              For SSR and static publishing pipelines, <code>result.assets.styles</code> reports the exported style paths needed by the
-              rendered document.
+            <p className="fine-print">
+              <strong>Built in</strong>: works with the default install. <strong>Plugin</strong>: an official or community extension exists.{" "}
+              <strong>Bring your own</strong>: you write or integrate it. Judged on default behaviour. Need React components inside your
+              content? That's MDX's job, and featherdown doesn't try to do it.
             </p>
           </div>
         </section>
 
-        <section id="playground" className="section">
+        <section id="features" className="section">
           <div className="container">
             <div className="section-head">
-              <h2>Live playground</h2>
-              <p>Proof of the output contract from one parse call.</p>
-              <p className="playground-note">
-                Client-side Mermaid preview in demo. Build-time Mermaid SVG rendering is available via <code>featherdown/node</code>.
-              </p>
+              <h2>What you get, rendered live</h2>
+              <p>Every example below is real Markdown, parsed in your browser by the package.</p>
             </div>
-
-            <div className="playground-actions">
-              <div className="control-group">
-                <span className="control-label">Presets</span>
-                <div className="preset-row">
-                  {(Object.keys(presetMap) as PresetId[]).map((preset) => (
-                    <button key={preset} className={activePreset === preset ? "active" : ""} onClick={() => applyPreset(preset)}>
-                      {presetMap[preset].label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="control-group control-group-end">
-                <span className="control-label">Quick actions</span>
-                <div className="preset-row">
-                  <button className="copy-install" onClick={resetPreset}>{resetLabel}</button>
-                  <button
-                    className="copy-install"
-                    onClick={() => copyTextWithFeedback(installSnippet, setInstallCopyLabel, "Copied install", "Copy install snippet")}
-                  >
-                    {installCopyLabel}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="playground-tabs" role="tablist" aria-label="Playground tabs">
-              {outputTabs.map((tab) => (
-                <button key={tab} role="tab" className={activeTab === tab ? "active" : ""} aria-selected={activeTab === tab} onClick={() => setActiveTab(tab)}>
-                  {tab[0].toUpperCase() + tab.slice(1)}
-                </button>
+            <div className="demo-grid">
+              {featureDemos.map((demo) => (
+                <FeatureDemo key={demo.title} demo={demo} />
               ))}
-            </div>
-
-            <div className="playground-shell">
-              <div className="playground-grid">
-                {activeTab === "preview" && (
-                  <article className="panel preview-panel">
-                    {errorMessage ? (
-                      <p className="error-message">{errorMessage}</p>
-                    ) : (
-                      <div ref={previewRef} className="preview markdown-surface featherdown-content" dangerouslySetInnerHTML={{ __html: result?.html ?? "" }} />
-                    )}
-                  </article>
-                )}
-
-                {activeTab === "markdown" && (
-                  <article className="panel editor-panel">
-                    <div className="playground-editor">
-                      <CodeMirror
-                        className="playground-codemirror"
-                        value={markdown}
-                        height="100%"
-                        extensions={[markdownLanguage()]}
-                        basicSetup={{ foldGutter: false, highlightActiveLine: false, highlightActiveLineGutter: false }}
-                        onChange={(value) => setMarkdown(value)}
-                        aria-label="Markdown editor"
-                      />
-                    </div>
-                  </article>
-                )}
-
-                {activeTab === "result" && (
-                  <article className="panel secondary-panel">
-                    {isRendering && <p className="muted">Rendering...</p>}
-                    {!isRendering && resultSummary && (
-                      <div className="result-grid result-summary-grid">
-                        <section className="result-card">
-                          <h3>Metadata</h3>
-                          <ul>
-                            <li>title: {resultSummary.metadata.title ?? "—"}</li>
-                            <li>description: {resultSummary.metadata.description ?? "—"}</li>
-                            <li>status: {resultSummary.metadata.status ?? "—"}</li>
-                            <li>tags: {resultSummary.metadata.tags?.join(", ") ?? "—"}</li>
-                          </ul>
-                        </section>
-                        <section className="result-card">
-                          <h3>Stats</h3>
-                          <ul>
-                            <li>word count: {resultSummary.stats.wordCount}</li>
-                            <li>reading time: {resultSummary.stats.readingTimeMinutes} min</li>
-                          </ul>
-                        </section>
-                        <section className="result-card">
-                          <h3>Navigation</h3>
-                          <ul>
-                            <li>toc items: {resultSummary.tocItems}</li>
-                            <li>headings: {resultSummary.headingItems}</li>
-                          </ul>
-                          <p className="muted">
-                            {result?.toc[0]
-                              ? `First item: ${result.toc[0].text} (h${result.toc[0].depth})`
-                              : "No toc entries for this document."}
-                          </p>
-                        </section>
-                        <section className="result-card">
-                          <h3>Diagnostics</h3>
-                          <p className="muted">
-                            {diagnosticCount === 0 ? "Status: clean (0 diagnostics)" : `Status: needs review (${diagnosticCount} diagnostics)`}
-                          </p>
-                          <p className="muted">{diagnostics[0] ? `Latest: ${diagnostics[0].code} - ${diagnostics[0].message}` : "No warnings for this parse."}</p>
-                        </section>
-                        <section className="result-card">
-                          <h3>Assets</h3>
-                          <ul>
-                            {(result?.assets.styles ?? []).length > 0
-                              ? (result?.assets.styles ?? []).map((style) => <li key={style}><code>{style}</code></li>)
-                              : <li>No exported style paths</li>}
-                          </ul>
-                          <p className="muted">
-                            enabled features:{" "}
-                            {Object.entries(result?.assets.features ?? {})
-                              .filter(([, enabled]) => Boolean(enabled))
-                              .map(([feature]) => feature)
-                              .join(", ") || "none"}
-                          </p>
-                        </section>
-                        <section className="result-card">
-                          <h3>Front matter extraction</h3>
-                          <p className="muted">{resultSummary.frontmatterKeys.length ? resultSummary.frontmatterKeys.join(", ") : "None"}</p>
-                        </section>
-                        <section className="result-card">
-                          <h3>Excerpt</h3>
-                          <p className="muted">{resultSummary.excerpt ?? "No excerpt generated."}</p>
-                        </section>
-                      </div>
-                    )}
-                  </article>
-                )}
-
-                {activeTab === "diagnostics" && (
-                  <article className="panel secondary-panel">
-                    <h3>Diagnostics</h3>
-                    {diagnostics.length === 0 ? (
-                      <p className="muted">No diagnostics were produced. Try the Diagnostics example preset.</p>
-                    ) : (
-                      <ul className="diagnostics-list">
-                        {diagnostics.map((item: RenderDiagnostic, idx) => (
-                          <li key={`${item.code}-${idx}`}>
-                            <code>{item.code}</code> {item.message} <span>({item.source})</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </article>
-                )}
-
-                {activeTab === "assets" && (
-                  <article className="panel secondary-panel">
-                    <h3>Assets and feature hints</h3>
-                    <div className="assets-grid">
-                      <section>
-                        <h4>Styles</h4>
-                        <ul>
-                          {(result?.assets.styles ?? []).map((style) => (
-                            <li key={style}><code>{style}</code></li>
-                          ))}
-                        </ul>
-                      </section>
-                      <section>
-                        <h4>Features</h4>
-                        <ul>
-                          <li>math: {String(result?.assets.features.math ?? false)}</li>
-                          <li>code: {String(result?.assets.features.code ?? false)}</li>
-                          <li>charts: {String(result?.assets.features.charts ?? false)}</li>
-                          <li>mermaid: {String(result?.assets.features.mermaid ?? false)}</li>
-                        </ul>
-                      </section>
-                    </div>
-                  </article>
-                )}
-              </div>
             </div>
           </div>
         </section>
 
-        <section className="section muted-section">
+        <section id="playground" className="section tint">
           <div className="container">
             <div className="section-head">
-              <h2>API paths</h2>
-              <p>Pick the entrypoint for your runtime and depth.</p>
+              <h2>Playground</h2>
+              <p>Edit on the left. Everything on the right comes from a single <code>parse()</code> call.</p>
             </div>
-            <div className="api-grid">
-              <article className="api-card">
+            <div className="preset-row" role="group" aria-label="Presets">
+              {(Object.keys(presetMap) as PresetId[]).map((preset) => (
+                <button key={preset} className={activePreset === preset ? "chip active" : "chip"} onClick={() => applyPreset(preset)}>
+                  {presetMap[preset].label}
+                </button>
+              ))}
+            </div>
+            <div className="playground">
+              <div className="pg-pane">
+                <div className="pg-head"><span>Markdown</span></div>
+                <div className="playground-editor">
+                  <CodeMirror
+                    className="playground-codemirror"
+                    value={markdown}
+                    height="100%"
+                    extensions={[markdownLanguage()]}
+                    basicSetup={{ foldGutter: false, highlightActiveLine: false, highlightActiveLineGutter: false }}
+                    onChange={(value) => setMarkdown(value)}
+                    aria-label="Markdown editor"
+                  />
+                </div>
+              </div>
+              <div className="pg-pane">
+                <div className="pg-head">
+                  <div className="tabs" role="tablist" aria-label="Output">
+                    {outputTabs.map((tab) => (
+                      <button key={tab} role="tab" className={activeTab === tab ? "active" : ""} aria-selected={activeTab === tab} onClick={() => setActiveTab(tab)}>
+                        {tab[0].toUpperCase() + tab.slice(1)}
+                        {tab === "diagnostics" && diagnostics.length > 0 ? <span className="badge">{diagnostics.length}</span> : null}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="pg-output">
+                  {errorMessage && <p className="error-message">{errorMessage}</p>}
+                  {!errorMessage && activeTab === "preview" && (
+                    <div ref={previewRef} className="preview markdown-surface featherdown-content" dangerouslySetInnerHTML={{ __html: result?.html ?? "" }} />
+                  )}
+                  {!errorMessage && activeTab === "result" && (
+                    <div className="result-pane">
+                      {isRendering && !result && <p className="muted">Rendering…</p>}
+                      {result && (
+                        <pre className="json-view"><code>{JSON.stringify(
+                          {
+                            metadata: result.metadata,
+                            stats: result.stats,
+                            excerpt: result.excerpt,
+                            toc: result.toc,
+                            diagnostics: result.diagnostics.length,
+                          },
+                          null,
+                          2,
+                        )}</code></pre>
+                      )}
+                    </div>
+                  )}
+                  {!errorMessage && activeTab === "diagnostics" && (
+                    <div className="result-pane">
+                      {diagnostics.length === 0 ? (
+                        <p className="muted">Clean parse. Load the “Diagnostics example” preset to see what an issue looks like.</p>
+                      ) : (
+                        <ul className="diagnostics-list">
+                          {diagnostics.map((item: RenderDiagnostic, idx) => (
+                            <li key={`${item.code}-${idx}`}>
+                              <code>{item.code}</code> {item.message} <span>({item.source})</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                  {!errorMessage && activeTab === "assets" && (
+                    <div className="result-pane">
+                      <h4>Styles this document needs</h4>
+                      <ul>
+                        {(result?.assets.styles ?? []).map((style) => (
+                          <li key={style}><code>{style}</code></li>
+                        ))}
+                      </ul>
+                      <h4>Features detected</h4>
+                      <ul>
+                        {Object.entries(result?.assets.features ?? {}).map(([name, on]) => (
+                          <li key={name}>{name}: {String(Boolean(on))}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <p className="fine-print">
+              Mermaid diagrams are hydrated client-side in this demo. For build-time SVG output, use <code>featherdown/node</code>.
+            </p>
+          </div>
+        </section>
+
+        <section id="start" className="section">
+          <div className="container">
+            <div className="section-head">
+              <h2>Get started</h2>
+              <p>Three steps, then pick the entry point that fits your runtime.</p>
+            </div>
+            <ol className="steps">
+              <li>
+                <h3>Install</h3>
+                <pre className="code-surface"><code>{installSnippet}</code></pre>
+              </li>
+              <li>
+                <h3>Parse</h3>
+                <pre className="code-surface"><code>{`import { Featherdown } from "featherdown";
+
+const fd = new Featherdown({ frontmatter: "auto" });
+const { html, metadata, toc } = await fd.parse(md);`}</code></pre>
+              </li>
+              <li>
+                <h3>Style</h3>
+                <pre className="code-surface"><code>{`import "featherdown/styles.css";
+
+// or load only what you need:
+import "featherdown/styles/base.css";
+import "featherdown/styles/code.css";`}</code></pre>
+                <p>Use <code>result.assets.styles</code> in SSR to emit only the CSS a page uses. Or skip ours and style the <code>featherdown-content</code> classes yourself.</p>
+              </li>
+            </ol>
+            <div className="entry-grid">
+              <article className="entry-card">
                 <h3>featherdown</h3>
-                <p>Browser-safe <code>parse()</code> for apps and previews.</p>
-                <pre><code>{`import { Featherdown } from "featherdown";`}</code></pre>
+                <p>Browser-safe. Use it for apps, editors and live previews.</p>
               </article>
-              <article className="api-card">
+              <article className="entry-card">
                 <h3>featherdown/node</h3>
-                <p><code>parseFile()</code> and build-time Mermaid SVG rendering.</p>
-                <pre><code>{`import { Featherdown } from "featherdown/node";`}</code></pre>
+                <p><code>parseFile()</code> and build-time Mermaid SVG for publishing jobs.</p>
               </article>
-              <article className="api-card">
-                <h3>featherdown/advanced</h3>
-                <p>Direct unified processor and plugin access.</p>
-                <pre><code>{`import { createMarkdownProcessor } from "featherdown/advanced";`}</code></pre>
-              </article>
-              <article className="api-card">
-                <h3>Legacy helpers</h3>
-                <p>Compatibility exports for older integrations.</p>
-                <pre><code>{`import { renderMarkdown } from "featherdown";`}</code></pre>
+              <article className="entry-card">
+                <h3>JSR / Deno</h3>
+                <p>Also published as <code>@karuifeather/featherdown</code>. Node 22+ for npm.</p>
               </article>
             </div>
-            <article className="boundary-note">
-              <h3>Client-side Mermaid previews</h3>
-              <p>
-                The browser-safe <code>featherdown</code> entry does not bundle Mermaid. For live previews, parse Markdown first, then hydrate{" "}
-                <code>code.language-mermaid</code> blocks in your app with the <code>mermaid</code> package. The demo uses this client-side
-                approach. For build-time SVG output, use <code>featherdown/node</code>.
-              </p>
-              <p><strong>Client-side Mermaid is app-level hydration, not part of the default Featherdown browser bundle.</strong></p>
-              <pre className="boundary-snippet"><code>{`import mermaid from "mermaid";
-
-const result = await featherdown.parse(markdown);
-
-mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
-
-for (const block of document.querySelectorAll("code.language-mermaid")) {
-  const source = block.textContent ?? "";
-  const { svg } = await mermaid.render(\`diagram-\${crypto.randomUUID()}\`, source);
-
-  block.closest("pre")?.replaceWith(
-    Object.assign(document.createElement("div"), {
-      innerHTML: svg,
-    }),
-  );
-}`}</code></pre>
-            </article>
           </div>
         </section>
       </main>
@@ -1127,11 +1186,10 @@ for (const block of document.querySelectorAll("code.language-mermaid")) {
       <footer className="footer">
         <div className="container footer-inner">
           <p className="footer-version">featherdown v{__FEATHERDOWN_VERSION__}</p>
-          <p className="footer-note">Browser-safe rendering for publishable markdown surfaces.</p>
           <nav>
             <a href={githubUrl} target="_blank" rel="noreferrer">GitHub</a>
             <a href={npmUrl} target="_blank" rel="noreferrer">npm</a>
-            <a href="https://github.com/karuifeather/featherdown/blob/main/LICENSE">License</a>
+            <a href={`${githubUrl}/blob/main/LICENSE`} target="_blank" rel="noreferrer">License</a>
           </nav>
         </div>
       </footer>

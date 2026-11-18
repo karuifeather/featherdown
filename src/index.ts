@@ -23,11 +23,16 @@ export { FeatherdownDiagnosticsError } from './featherdownDiagnosticsError.js';
 /** Shared public option, metadata, and diagnostic types. */
 export type {
   FeatherdownCodeOptions,
+  FeatherdownEmbedOptions,
+  FeatherdownEmbedProvider,
   FeatherdownHeadingOptions,
+  FeatherdownImageOptions,
+  FeatherdownLinkOptions,
   FeatherdownMathOptions,
   FeatherdownMetadata,
   FeatherdownOptions,
   FeatherdownParseOptions,
+  FeatherdownPlugins,
   FeatherdownPublishingOptions,
   FeatherdownResult,
   HeadingMetadata,
@@ -35,6 +40,7 @@ export type {
   RenderMarkdownDocumentResult,
   RenderMarkdownOptions,
   TocItem,
+  TocTreeItem,
 } from './types.js';
 
 export { libraryId } from './libraryId.js';

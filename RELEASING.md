@@ -57,7 +57,7 @@ The JSR surface is defined in `deno.json` exports and mirrors the npm JavaScript
 
 1. Confirm `main` is green (CI passing).
 2. Bump `version` in **`package.json`** and **`deno.json`** to the same semver.
-3. Commit the version bump (and any release notes you maintain). End-user migration for the Featherdown-first API is documented in **README.md** under **Migration from legacy helpers**; there is no separate changelog file—use the tag message or GitHub release notes for semver highlights when helpful.
+3. Commit the version bump (and any release notes you maintain). End-user migration for the Featherdown-first API is documented in **README.md** under **Migration from legacy helpers**. Move the `[Unreleased]` entries in **CHANGELOG.md** under a new `## [x.y.z] - YYYY-MM-DD` heading; that section also serves as the GitHub release notes.
 4. Create and push an annotated tag, for example:
 
    ```bash

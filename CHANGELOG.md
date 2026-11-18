@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `code.css` no longer stacks highlight.js's `pre code.hljs { padding: 1em }` on top of the code block's own padding, which left uneven extra space inside fenced code blocks.
 - Code line highlights `{n}`, line numbers and `diff` lines now work with `code: { highlighting: false }`.
 - GitHub alert titles keep inline-formatted text (`> [!NOTE] **Heads up**`).
 - Footnote references always link to the footnote, even when a heading slug matches the footnote id.

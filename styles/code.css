@@ -31,6 +31,9 @@
   color: var(--fd-color-code-text);
   background: transparent;
   font-size: 85%;
+  /* The pre owns the block padding. highlight.js themes ship `pre code.hljs { padding: 1em }`,
+     which would stack on top of it. */
+  padding: 0;
 }
 
 .featherdown-content .code-block-copyable {

@@ -130,6 +130,7 @@ describe('author ids colliding with footnote ids', () => {
     expect(r.html).toContain('<li id="user-content-fn-1">');
     expect(r.html).toMatch(/<h2 id="user-content-fn-1-1"/);
     expect(r.toc[0]?.id).toBe('user-content-fn-1-1');
+    expect(r.html).toMatch(/<h2 id="user-content-fn-1-1"><a [^>]*href="#user-content-fn-1-1"/);
     expect(r.html).toMatch(/<a href="#user-content-fn-1"[^>]*data-footnote-ref/);
   });
 

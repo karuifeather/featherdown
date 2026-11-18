@@ -27,6 +27,8 @@ The default npm entry is **browser-safe**. Optional **Node-only** Mermaid (inlin
 - [Math](#math)
 - [Charts](#charts)
 - [Callouts, alerts, and details](#callouts-alerts-and-details)
+- [Subscript, superscript, and definition lists](#subscript-superscript-and-definition-lists)
+- [Tabs](#tabs)
 - [Footnotes](#footnotes)
 - [Links and images](#links-and-images)
 - [Embeds](#embeds)
@@ -137,6 +139,9 @@ What you get from `new Featherdown()` with no options:
 | `charts` | **on** | Valid `chart-*` fences become mount placeholders. |
 | `alerts` | **on** | `> [!NOTE]` and friends become callouts. |
 | `details` | **on** | `:::details[Summary]` becomes `<details>`. |
+| `subSuperscript` | **on** | `H~2~O` and `x^2^` become `<sub>` / `<sup>`. Single `~x~` is no longer strikethrough (use `~~x~~`). |
+| `definitionLists` | **on** | `Term` then `: Definition` becomes `<dl>`. |
+| `tabs` | **on** | `::::tabs` with `:::tab[Label]` panels becomes tab markup. Needs a few lines of JS to switch panels. |
 | `headings` | **on** | Fills `toc`, `tocTree`, `headings` (depth 1–6). |
 | `publishing` | **on** | Fills `excerpt`, `wordCount`, `estimatedReadingMinutes`. |
 | `diagnostics` | **on** (warn) | Returned on `result.diagnostics`; never throws unless `"strict"`. |
@@ -160,6 +165,9 @@ Behaviors that surprise people. Each one is intentional, but easy to trip on.
 **Content**
 
 - **Stray dollar signs become math.** With `math` on (the default), `costs $5 or $10` renders `5 or` as a formula. Escape each sign (`\$5`) or set `math: false`. Dollar signs inside inline code and code fences are safe.
+- **`~x~` is subscript, not strikethrough.** With `subSuperscript` on (the default), only `~~x~~` strikes through. The marks must enclose text with no whitespace, so `~/src and ~/dist` and `a ^ b ^ c` are left alone. Backslash escapes are resolved before this runs, so `\^x\^` still becomes a superscript; put a space inside the pair to show it literally.
+- **Tabs need four colons on the outside.** Write `::::tabs` around `:::tab[Label]`. The markup has no behavior until you wire it up ([Tabs](#tabs)); until then every panel is shown under its label.
+- **Broken math is reported, not thrown.** An equation KaTeX cannot render stays on the page as red text and adds a `math.render` diagnostic. Use `diagnostics: "strict"` to fail a build on it.
 - **Custom heading ids are prefixed.** A heading written `## Top {#my-id}` renders `id="user-content-my-id"`, and `toc` / `headings` report the same prefixed id. Links inside the document (`[x](#my-id)`) are rewritten to match, but links to the page from **elsewhere** must use the prefixed id. Automatic ids (`## Top` → `top`) are not prefixed.
 - **Ids that collide with footnotes are renamed.** `## Top {#fn-1}` becomes `user-content-fn-1-1` so it cannot duplicate the footnote's id. Author links written `#fn-1` still go to the footnote.
 - **`code: false` disables fence extras.** `title="..."`, `{2,4}` line highlights, line numbers, copy hooks, and `diff` marking are all part of the code pipeline.
@@ -197,7 +205,7 @@ Fixes and behavior changes by release are in [CHANGELOG.md](./CHANGELOG.md); the
 | **`wordCount`** / **`estimatedReadingMinutes`** | Derived from the rendered document text (subject to `publishing` options). |
 | **`stats`** | Mirrors `wordCount` and reading time for convenience. |
 | **`diagnostics`** | Non-fatal warnings (for example invalid chart JSON, manifest misses, or blocked embeds). See [Diagnostics](#diagnostics). |
-| **`assets`** | Hints such as **`assets.styles`** (selective package CSS paths) and **`assets.features`** (`math`, `code`, `charts`, `mermaid`, `embeds`). |
+| **`assets`** | Hints such as **`assets.styles`** (selective package CSS paths) and **`assets.features`** (`math`, `code`, `charts`, `mermaid`, `embeds`, `tabs`). |
 
 `assets.styles` and `assets.features` reflect **content actually rendered** in the document, not just which options are enabled. For example, `features.embeds` is `true` only when an embed was emitted, and `features.mermaid` is `true` only on the Node entry when an SVG diagram was produced. `assets.styles` lists **selective** style paths (for example `featherdown/styles/base.css`), not the all-in `featherdown/styles.css` aggregate.
 
@@ -260,9 +268,9 @@ const featherdown = new Featherdown({
 ### Option reference
 
 - **`frontmatter`** — `false`, `true`, or `"auto"`; controls whether leading YAML front matter is parsed and stripped from `body`. Default `false`. See [Front matter](#front-matter).
-- **`math`** — Toggle KaTeX HTML output for `$…$` / `$$…$$`. See [Math](#math).
+- **`math`** — Toggle KaTeX HTML output for `$…$` / `$$…$$`, or pass an object with **`macros`**, **`trust`**, and **`strict`**. See [Math](#math).
 - **`code`** — Toggle code pipeline features; **`highlighting`** controls whether highlight.js classes and **`highlight.css`** are relevant. **`lineNumbers`** and **`copyButton`** set global defaults for every fence (both default `false`). See [Code blocks](#code-blocks).
-- **`sanitize`** — When enabled, author content (Markdown and raw HTML) passes through `rehype-sanitize` with the package schema **before** Featherdown adds its own markup (KaTeX, code chrome, chart mounts, heading anchors, embeds). Raw HTML keeps safe tags and attributes but loses `style`, `<button>`, and any `class` other than `language-*` on `code`, the callout classes on `div`, and the `details` class on `details` (which is kept).
+- **`sanitize`** — When enabled, author content (Markdown and raw HTML) passes through `rehype-sanitize` with the package schema **before** Featherdown adds its own markup (KaTeX, code chrome, chart mounts, heading anchors, embeds). Raw HTML keeps safe tags and attributes but loses `style`, `<button>`, and any `class` other than `language-*` on `code`, the callout classes on `div`, and the `details` class on `details` (which is kept), plus `tabs` / `tab-panel` on `div` (with `data-tab-label`) for [tabs](#tabs).
 - **`diagnostics`** — Controls whether warnings appear on the result and whether strict mode fails the parse. See [Diagnostics](#diagnostics).
   - **`false`** — `result.diagnostics` is always `[]` (issues may still be detected internally).
   - **`true`** or **`"warn"`** — Non-fatal diagnostics are returned on `result.diagnostics`; the parse does not throw.
@@ -278,6 +286,9 @@ const featherdown = new Featherdown({
 - **`publishing`** — Gates excerpt, word count, and reading-time fields on the result.
 - **`alerts`** — GitHub-style alerts (`> [!NOTE]`) become callouts. Default **`true`**. See [Callouts, alerts, and details](#callouts-alerts-and-details).
 - **`details`** — `:::details[Summary]` collapsible sections. Default **`true`**.
+- **`subSuperscript`** — `H~2~O` and `x^2^`. Default **`true`**. See [Subscript, superscript, and definition lists](#subscript-superscript-and-definition-lists).
+- **`definitionLists`** — `Term` / `: Definition`. Default **`true`**.
+- **`tabs`** — `::::tabs` / `:::tab[Label]`. Default **`true`**. See [Tabs](#tabs).
 - **`links`** — External link decoration. **Opt in** (default off). Accepts `true` or an object:
   - **`rel`** — Default `"noopener noreferrer"`. Tokens are merged without duplicates. `false` leaves `rel` alone.
   - **`target`** — Default `"_blank"`. `false` leaves `target` alone.
@@ -378,6 +389,27 @@ Ensure KaTeX styles are loaded (all-in `featherdown/styles.css`, or `featherdown
 
 Because `$` delimits math, prose with several dollar signs can be misread as a formula. Escape them (`\$5 or \$10`) or turn math off for that content.
 
+### KaTeX options
+
+Pass an object instead of `true` to configure KaTeX:
+
+```ts
+const featherdown = new Featherdown({
+  math: {
+    macros: { "\\RR": "\\mathbb{R}", "\\norm": "\\left\\lVert #1 \\right\\rVert" },
+    strict: "warn",
+  },
+});
+
+await featherdown.parse("$x \\in \\RR$ and $\\norm{x}$");
+```
+
+- **`macros`** — KaTeX macros; keys start with a backslash. Constructor and per-call macros are merged, with the per-call value winning on a conflict. Every parse gets its own copy, so a `\gdef` in one document never leaks into the next.
+- **`strict`** — How KaTeX treats valid but non-strict input, such as Unicode text in math mode. `"ignore"` (the default) stays silent. `"warn"` adds a `math.strict` diagnostic. `"error"` (or `true`) adds a `math.render` diagnostic. The equation renders in every mode, so pair `"warn"` or `"error"` with `diagnostics: "strict"` to fail a build on non-strict LaTeX.
+- **`trust`** — Default `false`. When `true`, KaTeX's HTML-extension commands (`\href`, `\url`, `\includegraphics`, `\htmlClass`, `\htmlId`, `\htmlStyle`, `\htmlData`) work. KaTeX output is added **after** sanitization, so this lets math author arbitrary links, ids, classes, and inline styles. Use it only for content you trust. While it is off, each blocked command adds a `math.trust` diagnostic.
+
+An equation that fails to render stays on the page as red text and adds a `math.render` diagnostic, so `diagnostics: "strict"` catches broken math in CI.
+
 ## Charts
 
 Valid `chart-*` fenced JSON becomes a **`chart-mount`** placeholder with `data-chart` and `data-chart-data`. The package does **not** bundle a chart runtime—your app hydrates or renders charts.
@@ -415,6 +447,92 @@ Hidden **content**.
 ```
 
 This renders `<details class="details" open>` with a `<summary>`. The summary defaults to `Details` when omitted. Callouts and alerts can be nested inside details. Set `details: false` to leave the directive as plain text.
+
+## Subscript, superscript, and definition lists
+
+```md
+H~2~O, x^2^, and CO~2~ emissions
+
+Term
+: First definition
+: Second definition
+
+Another term
+: With **inline** markdown
+```
+
+This renders `H<sub>2</sub>O`, `x<sup>2</sup>`, and a `<dl>` with `<dt>` and `<dd>` elements.
+
+- **Sub and superscript.** `~text~` becomes `<sub>` and `^text^` becomes `<sup>`. The text between the marks cannot contain whitespace, so `~/src and ~/dist` and `a ^ b ^ c` stay as written. Code, math, code fences, link destinations, bare URLs, and footnote references (`[^1]`) are never touched. Only the double-tilde `~~x~~` is strikethrough while this is on. Set `subSuperscript: false` to restore GFM's single-tilde strikethrough.
+- **Definition lists.** A term line followed by lines starting with `: `. Set `definitionLists: false` to leave them as text.
+
+Both are on by default for `Featherdown` and are not applied by the legacy helpers.
+
+## Tabs
+
+```md
+::::tabs
+:::tab[npm]
+`npm install featherdown`
+:::
+:::tab[pnpm]
+`pnpm add featherdown`
+:::
+::::
+```
+
+The outer fence needs more colons than the inner one (`::::tabs` around `:::tab`). Panels can contain any markdown, including code fences, callouts, and details. A panel with no label is titled `Tab 1`, `Tab 2`, and so on.
+
+The output is semantic markup only:
+
+```html
+<div class="tabs">
+  <div class="tabs-list" role="tablist">
+    <button type="button" role="tab" class="tabs-tab" id="featherdown-tab-1-1" aria-controls="featherdown-panel-1-1" aria-selected="true" tabindex="0">npm</button>
+    <button type="button" role="tab" class="tabs-tab" id="featherdown-tab-1-2" aria-controls="featherdown-panel-1-2" aria-selected="false" tabindex="-1">pnpm</button>
+  </div>
+  <div class="tab-panel" id="featherdown-panel-1-1" role="tabpanel" aria-labelledby="featherdown-tab-1-1" data-tab-label="npm">…</div>
+  <div class="tab-panel" id="featherdown-panel-1-2" role="tabpanel" aria-labelledby="featherdown-tab-1-2" data-tab-label="pnpm">…</div>
+</div>
+```
+
+Featherdown ships no client runtime, so switching panels is up to your app. Until a group has `data-tabs-ready`, the shipped CSS hides the tab list and shows every panel under its label, so the content still reads correctly without JavaScript. Once you set the attribute, show one panel at a time:
+
+```js
+document.querySelectorAll(".featherdown-content .tabs").forEach((group) => {
+  const tabs = [...group.querySelectorAll(':scope > .tabs-list > [role="tab"]')];
+  const panels = [...group.querySelectorAll(':scope > [role="tabpanel"]')];
+  const select = (index) => {
+    tabs.forEach((tab, i) => {
+      tab.setAttribute("aria-selected", String(i === index));
+      tab.tabIndex = i === index ? 0 : -1;
+    });
+    panels.forEach((panel, i) => {
+      panel.hidden = i !== index;
+    });
+  };
+  tabs.forEach((tab, i) => {
+    tab.addEventListener("click", () => select(i));
+    tab.addEventListener("keydown", (event) => {
+      const target =
+        event.key === "ArrowRight" ? i + 1
+        : event.key === "ArrowLeft" ? i - 1
+        : event.key === "Home" ? 0
+        : event.key === "End" ? tabs.length - 1
+        : null;
+      if (target === null) return;
+      event.preventDefault();
+      const next = (target + tabs.length) % tabs.length;
+      select(next);
+      tabs[next].focus();
+    });
+  });
+  select(0);
+  group.setAttribute("data-tabs-ready", "");
+});
+```
+
+Ids use a `featherdown-` prefix. Author ids are prefixed `user-content-`, so they cannot collide. A `:::tabs` block with no `:::tab` panels, content outside a panel, or a `:::tab` outside any `::::tabs` reports `tabs.invalid`. `result.assets.features.tabs` is `true` when a tab group was rendered. Set `tabs: false` to leave the directives as text.
 
 ## Footnotes
 
@@ -527,6 +645,10 @@ Diagnostics are non-fatal warnings on `result.diagnostics`. Each has a `code`, a
 | `images.manifest_miss` | `images` | A manifest lookup finds no entry for an image. The original `src` is kept. |
 | `embeds.blocked` | `embeds` | A raw iframe or `::embed` URL did not match the allowlist, or an iframe had no `src`. A directive with a well-formed but disallowed `src` (such as `::embed{src="javascript:..."}`) also reports this. |
 | `embeds.invalid` | `embeds` | A directive is missing required input or has a malformed id (for example `::youtube{id="bad"}` or `::embed{}`). |
+| `math.render` | `math` | KaTeX could not render an equation (a parse error or an undefined command), or `math.strict` is `"error"` and the input is not strict LaTeX. The equation stays on the page as red text. |
+| `math.strict` | `math` | `math.strict` is `"warn"` and an equation is valid but not strict LaTeX. It still renders. |
+| `math.trust` | `math` | An equation used a KaTeX HTML-extension command (`\href`, `\htmlStyle`, ...) while `math.trust` is off. |
+| `tabs.invalid` | `tabs` | A `:::tabs` block has no panels or has content outside a panel, or a `:::tab` is outside a `::::tabs` block. |
 
 Not everything produces a diagnostic. Invalid front matter YAML, for instance, is silently treated as body content.
 
@@ -608,6 +730,8 @@ Rendered output uses stable classes including:
 - **Code:** `code-block`, `code-block-title`, `code-line`, `code-line-highlighted`, `code-line-added`, `code-line-removed`, `code-line-numbered`, `code-line-number`, `code-block-copyable`, `code-block-copy-button`
 - **Charts:** `chart-mount`
 - **Images:** `markdown-inline-img`, `markdown-figure` (on `<figure>`)
+- **Tabs:** `tabs`, `tabs-list`, `tabs-tab`, `tab-panel` (`data-tab-label` on panels, `data-tabs-ready` set by your script)
+- **Sub and superscript, definition lists:** plain `<sub>`, `<sup>`, `<dl>`, `<dt>`, `<dd>`
 - **Embeds:** `embed` and `embed-<provider>` (`youtube`, `vimeo`, `codepen`, `codesandbox`, `stackblitz`, or `custom`)
 
 ## Security and trust
@@ -616,6 +740,7 @@ Rendered output uses stable classes including:
 - Scripts, event handlers, and `javascript:` URLs are stripped. This holds only while `sanitize` is on.
 - Prefer the **default** entry for untrusted user content.
 - The **Node Mermaid** path sanitizes diagram SVG too, but Mermaid itself executes diagram source in headless Chromium; it is better suited to **trusted** publishing inputs.
+- **KaTeX `trust`** is off by default. Turning it on lets math emit links, ids, classes, and inline styles after sanitization, so enable it only for trusted content.
 - **Embeds** are off by default. When enabled, they are limited to the provider and host allowlists above. Do not add your own site's origin to `allowHosts`, because embeds run with `allow-same-origin`.
 - **User plugins:** `plugins.remark` runs before HTML conversion, so its output is still sanitized. `plugins.rehype` runs **after** sanitization, right before serialization, and its output is **not** sanitized. Treat rehype plugins as trusted code, and never build them from user input.
 

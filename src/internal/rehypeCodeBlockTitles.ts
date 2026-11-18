@@ -1,11 +1,17 @@
 import type { Element, Root } from 'hast';
 import { visit } from 'unist-util-visit';
 import type { Plugin } from 'unified';
+import { getPipelineContext } from './pipelineContext.js';
 
 const CHART_LANGUAGE_PREFIX = 'language-chart-';
 const WRAPPER_CLASS = 'code-block';
 const COPYABLE_CLASS = 'code-block-copyable';
 const COPY_BUTTON_CLASS = 'code-block-copy-button';
+
+function hasLanguage(className: unknown, language: string): boolean {
+  const values = Array.isArray(className) ? className : [className];
+  return values.includes(language);
+}
 
 function hasChartLanguage(className: unknown): boolean {
   const values = Array.isArray(className)
@@ -20,7 +26,9 @@ function hasChartLanguage(className: unknown): boolean {
  * Wraps code blocks with stable title and copy-button markup.
  */
 const rehypeCodeBlockTitles: Plugin<[], Root> = function rehypeCodeBlockTitles() {
-  return (tree): undefined => {
+  return (tree, file): undefined => {
+    // Read per parse: the processor is cached and shared across parses.
+    const globalCopyButton = getPipelineContext(file)?.config?.code?.copyButton === true;
     let copyTargetCount = 0;
     visit(tree, 'element', (node, index, parent) => {
       if (node.tagName !== 'pre') return;
@@ -32,10 +40,14 @@ const rehypeCodeBlockTitles: Plugin<[], Root> = function rehypeCodeBlockTitles()
 
       const title = code.properties.dataCodeBlockTitle;
       delete code.properties.dataCodeBlockTitle;
+      const copyFlag = code.properties.dataCodeCopyButton;
+      // The global default never applies to Mermaid fences; an explicit per-fence flag always wins.
       const hasCopyButton =
-        code.properties.dataCodeCopyButton === true ||
-        code.properties.dataCodeCopyButton === 'true' ||
-        code.properties.dataCodeCopyButton === '';
+        copyFlag === 'false'
+          ? false
+          : copyFlag === true || copyFlag === 'true' || copyFlag === ''
+            ? true
+            : globalCopyButton && !hasLanguage(code.properties.className, 'language-mermaid');
       delete code.properties.dataCodeCopyButton;
 
       if (typeof title !== 'string' && !hasCopyButton) return;

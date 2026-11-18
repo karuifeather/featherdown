@@ -1,6 +1,7 @@
 import type { Element, ElementContent, Root, Text } from 'hast';
 import { visit } from 'unist-util-visit';
 import type { Plugin } from 'unified';
+import { getPipelineContext } from './pipelineContext.js';
 
 const CHART_LANGUAGE_PREFIX = 'language-chart-';
 const CODE_LINE_CLASS = 'code-line';
@@ -43,8 +44,38 @@ function getHighlightLines(value: unknown): Set<number> {
   return lines;
 }
 
-function getShowLineNumbers(value: unknown): boolean {
-  return value === true || value === 'true' || value === '';
+const CODE_LINE_ADDED_CLASS = 'code-line-added';
+const CODE_LINE_REMOVED_CLASS = 'code-line-removed';
+
+/**
+ * Resolves line numbering: `undefined` = off, otherwise the first line number.
+ * Per-fence value (`true` / '' / 'true' / numeric string / 'false') wins over the
+ * global default. The global default never applies to Mermaid fences.
+ */
+function getLineNumberStart(value: unknown, globalDefault: boolean, isMermaid: boolean): number | undefined {
+  if (value === 'false') return undefined;
+  if (value === true || value === 'true' || value === '') return 1;
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 1) return value;
+  if (typeof value === 'string' && /^\d+$/.test(value)) return Math.max(1, Number(value));
+  return globalDefault && !isMermaid ? 1 : undefined;
+}
+
+function textOf(nodes: ElementContent[]): string {
+  let out = '';
+  for (const n of nodes) {
+    if (n.type === 'text') out += n.value;
+    else if (n.type === 'element') out += textOf(n.children);
+    if (out.length > 0) break;
+  }
+  return out;
+}
+
+/** Diff state of a line of a `diff`-language fence: `+` added, `-` removed (not `+++` / `---` headers). */
+function diffLanguageMarker(line: ElementContent[]): 'a' | 'r' | undefined {
+  const text = textOf(line);
+  if (text.startsWith('+') && !text.startsWith('+++')) return 'a';
+  if (text.startsWith('-') && !text.startsWith('---')) return 'r';
+  return undefined;
 }
 
 function ensureClassNameList(className: unknown): string[] {
@@ -95,16 +126,29 @@ function isEmptyLine(line: ElementContent[]): boolean {
  * Adds line-level wrappers and highlight classes for configured code ranges.
  */
 const rehypeCodeLineHighlights: Plugin<[], Root> = function rehypeCodeLineHighlights() {
-  return (tree): undefined => {
+  return (tree, file): undefined => {
+    // Read per parse: the processor is cached and shared across parses.
+    const globalLineNumbers = getPipelineContext(file)?.config?.code?.lineNumbers === true;
     visit(tree, 'element', (node) => {
       if (node.tagName !== 'code') return;
       if (hasChartLanguage(node.properties.className)) return;
 
       const highlightLines = getHighlightLines(node.properties.dataCodeLineHighlights);
       delete node.properties.dataCodeLineHighlights;
-      const showLineNumbers = getShowLineNumbers(node.properties.dataCodeLineNumbers);
+      const classList = ensureClassNameList(node.properties.className);
+      const isMermaid = classList.includes('language-mermaid');
+      const lineNumberStart = getLineNumberStart(
+        node.properties.dataCodeLineNumbers,
+        globalLineNumbers,
+        isMermaid,
+      );
       delete node.properties.dataCodeLineNumbers;
-      if (highlightLines.size === 0 && !showLineNumbers) return;
+      const showLineNumbers = lineNumberStart !== undefined;
+      const diffMarkers =
+        typeof node.properties.dataCodeDiffLines === 'string' ? node.properties.dataCodeDiffLines : '';
+      delete node.properties.dataCodeDiffLines;
+      const isDiffLanguage = classList.includes('language-diff');
+      if (highlightLines.size === 0 && !showLineNumbers && !isDiffLanguage && diffMarkers === '') return;
 
       if (showLineNumbers) {
         const classNames = ensureClassNameList(node.properties.className);
@@ -121,17 +165,28 @@ const rehypeCodeLineHighlights: Plugin<[], Root> = function rehypeCodeLineHighli
 
       const children: ElementContent[] = [];
       for (let i = 0; i < contentLines.length; i += 1) {
+        // Highlight ranges and diff markers index lines within the block (1-based);
+        // only the displayed number is offset by the start value.
         const lineNumber = i + 1;
+        const displayNumber = (lineNumberStart ?? 1) + i;
         const className = highlightLines.has(lineNumber)
           ? [CODE_LINE_CLASS, CODE_LINE_HIGHLIGHTED_CLASS]
           : [CODE_LINE_CLASS];
+        const marker = diffMarkers[i];
+        const diffState = isDiffLanguage
+          ? diffLanguageMarker(contentLines[i] ?? [])
+          : marker === 'a' || marker === 'r'
+            ? marker
+            : undefined;
+        if (diffState === 'a') className.push(CODE_LINE_ADDED_CLASS);
+        if (diffState === 'r') className.push(CODE_LINE_REMOVED_CLASS);
         const lineChildren: ElementContent[] = [];
         if (showLineNumbers) {
           lineChildren.push({
             type: 'element',
             tagName: 'span',
             properties: { className: [CODE_LINE_NUMBER_CLASS] },
-            children: [{ type: 'text', value: String(lineNumber) }],
+            children: [{ type: 'text', value: String(displayNumber) }],
           });
         }
         lineChildren.push(...(contentLines[i] ?? []));

@@ -5,8 +5,19 @@ import type { Plugin } from 'unified';
 const CHART_LANGUAGE_PREFIX = 'chart-';
 const TITLE_META_PATTERN = /(?:^|\s)title="([^"]*)"(?:\s|$)/;
 const LINE_HIGHLIGHT_PATTERN = /\{([^}]*)\}/;
-const LINE_NUMBERS_PATTERN = /(?:^|\s)(?:showLineNumbers|lineNumbers)(?:\s|$)/;
-const COPY_BUTTON_PATTERN = /(?:^|\s)(?:showCopyButton|copyButton)(?:\s|$)/;
+// Fence meta flags (matched after any `title="..."` is removed from the meta):
+//   showLineNumbers | lineNumbers         enable line numbers
+//   showLineNumbers=10                    enable, numbering starts at 10
+//   showLineNumbers=false | noLineNumbers opt out (overrides `code.lineNumbers: true`)
+//   showCopyButton | copyButton           enable the copy button
+//   showCopyButton=false | noCopyButton   opt out (overrides `code.copyButton: true`)
+//   diff                                  on a non-`diff` language: leading `+` / `-` mark
+//                                         added / removed lines and the marker is stripped
+const LINE_NUMBERS_PATTERN = /(?:^|\s)(?:showLineNumbers|lineNumbers)(?:=(\d+|false))?(?=\s|$)/;
+const NO_LINE_NUMBERS_PATTERN = /(?:^|\s)noLineNumbers(?=\s|$)/;
+const COPY_BUTTON_PATTERN = /(?:^|\s)(?:showCopyButton|copyButton)(?:=(false))?(?=\s|$)/;
+const NO_COPY_BUTTON_PATTERN = /(?:^|\s)noCopyButton(?=\s|$)/;
+const DIFF_FLAG_PATTERN = /(?:^|\s)diff(?=\s|$)/;
 
 function getCodeBlockTitle(meta: unknown): string | undefined {
   if (typeof meta !== 'string') {
@@ -59,12 +70,68 @@ function getCodeBlockHighlightLines(meta: unknown): number[] {
   return Array.from(highlights).sort((a, b) => a - b);
 }
 
-function hasCodeBlockLineNumbers(meta: unknown): boolean {
-  return typeof meta === 'string' && LINE_NUMBERS_PATTERN.test(meta);
+function stripTitle(meta: unknown): string {
+  return typeof meta === 'string' ? meta.replace(/title="[^"]*"/, ' ') : '';
 }
 
-function hasCodeBlockCopyButton(meta: unknown): boolean {
-  return typeof meta === 'string' && COPY_BUTTON_PATTERN.test(meta);
+/** `true`, a start number, `'false'` (explicit opt-out) or undefined (use the global default). */
+function getCodeBlockLineNumbers(meta: unknown): true | number | 'false' | undefined {
+  const flags = stripTitle(meta);
+  if (NO_LINE_NUMBERS_PATTERN.test(flags)) {
+    return 'false';
+  }
+  const match = LINE_NUMBERS_PATTERN.exec(flags);
+  if (!match) {
+    return undefined;
+  }
+  const value = match[1];
+  if (value === 'false') {
+    return 'false';
+  }
+  if (value === undefined) {
+    return true;
+  }
+  return Math.max(1, Number(value));
+}
+
+/** `true`, `'false'` (explicit opt-out) or undefined (use the global default). */
+function getCodeBlockCopyButton(meta: unknown): true | 'false' | undefined {
+  const flags = stripTitle(meta);
+  if (NO_COPY_BUTTON_PATTERN.test(flags)) {
+    return 'false';
+  }
+  const match = COPY_BUTTON_PATTERN.exec(flags);
+  if (!match) {
+    return undefined;
+  }
+  return match[1] === 'false' ? 'false' : true;
+}
+
+/**
+ * For `ts diff`: strips one leading `+` / `-` per line and returns one marker
+ * char per line (`a` added, `r` removed, `.` other). Lines without a marker are
+ * left untouched (write context lines without a leading space). The `diff`
+ * language itself keeps its markers and is handled in the rehype stage.
+ */
+function extractDiffMarkers(node: Code): string | undefined {
+  if (!node.lang || node.lang === 'diff' || !DIFF_FLAG_PATTERN.test(stripTitle(node.meta))) {
+    return undefined;
+  }
+  let markers = '';
+  const lines = node.value.split('\n').map((line) => {
+    if (line.startsWith('+')) {
+      markers += 'a';
+      return line.slice(1);
+    }
+    if (line.startsWith('-')) {
+      markers += 'r';
+      return line.slice(1);
+    }
+    markers += '.';
+    return line;
+  });
+  node.value = lines.join('\n');
+  return /[ar]/.test(markers) ? markers : undefined;
 }
 
 /**
@@ -79,9 +146,16 @@ export const remarkCodeBlockTitles: Plugin<[], Root> = function remarkCodeBlockT
 
       const title = getCodeBlockTitle(node.meta);
       const highlights = getCodeBlockHighlightLines(node.meta);
-      const hasLineNumbers = hasCodeBlockLineNumbers(node.meta);
-      const hasCopyButton = hasCodeBlockCopyButton(node.meta);
-      if (title === undefined && highlights.length === 0 && !hasLineNumbers && !hasCopyButton) {
+      const lineNumbers = getCodeBlockLineNumbers(node.meta);
+      const copyButton = getCodeBlockCopyButton(node.meta);
+      const diffMarkers = extractDiffMarkers(node);
+      if (
+        title === undefined &&
+        highlights.length === 0 &&
+        lineNumbers === undefined &&
+        copyButton === undefined &&
+        diffMarkers === undefined
+      ) {
         return;
       }
 
@@ -94,11 +168,14 @@ export const remarkCodeBlockTitles: Plugin<[], Root> = function remarkCodeBlockT
       if (highlights.length > 0) {
         node.data.hProperties.dataCodeLineHighlights = highlights;
       }
-      if (hasLineNumbers) {
-        node.data.hProperties.dataCodeLineNumbers = true;
+      if (lineNumbers !== undefined) {
+        node.data.hProperties.dataCodeLineNumbers = lineNumbers;
       }
-      if (hasCopyButton) {
-        node.data.hProperties.dataCodeCopyButton = true;
+      if (copyButton !== undefined) {
+        node.data.hProperties.dataCodeCopyButton = copyButton;
+      }
+      if (diffMarkers !== undefined) {
+        node.data.hProperties.dataCodeDiffLines = diffMarkers;
       }
     });
   };

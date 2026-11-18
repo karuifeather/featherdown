@@ -34,7 +34,7 @@ First stable release. From here the public API follows semantic versioning; see 
 
 ### Fixed
 
-- Text such as `10:30` or `:smile:` no longer loses characters. remark-directive read `:30` as an inline directive, which rendered as an empty element. Inline directives are now restored to the text they were written as (this also applies to the legacy helpers). Text that only looked like a directive and used to vanish silently, for example a pasted `:chatgpt-content-reference{index="0"}` marker, now appears as written; remove such leftovers from your content.
+- Text such as `10:30` or `:smile:` no longer loses characters. remark-directive read `:30` as an inline directive, which rendered as an empty element. Inline directives are now restored to the text they were written as (this also applies to the legacy helpers).
 
 ## [0.5.1] - 2026-11-18
 

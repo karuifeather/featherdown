@@ -260,3 +260,19 @@
   min-height: 5.5rem;
   background: var(--fd-color-subtle);
 }
+
+.featherdown-content figure.markdown-figure {
+  margin: 1.25rem 0;
+  text-align: center;
+}
+
+.featherdown-content figure.markdown-figure img {
+  max-width: 100%;
+  height: auto;
+}
+
+.featherdown-content figure.markdown-figure figcaption {
+  margin-top: 0.5rem;
+  font-size: 0.875em;
+  color: var(--fd-color-muted);
+}

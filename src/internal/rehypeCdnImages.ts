@@ -3,7 +3,7 @@ import { visit } from 'unist-util-visit';
 import type { DiagnosticEmitter } from './diagnostics.js';
 import { getPipelineContext } from './pipelineContext.js';
 
-type ManifestEntry = { url: string };
+type ManifestEntry = { url: string; width?: number; height?: number };
 
 type RehypeCdnImagesOptions = {
   kind?: string;
@@ -25,6 +25,15 @@ function getClassList(className: unknown): string[] {
     return [className];
   }
   return [];
+}
+
+function applyDimensions(node: Element, entry: ManifestEntry): void {
+  for (const key of ['width', 'height'] as const) {
+    const value = entry[key];
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      node.properties[key] = Math.round(value);
+    }
+  }
 }
 
 function ensureInlineClass(node: Element): void {
@@ -62,8 +71,11 @@ export default function rehypeCdnImages(options?: RehypeCdnImagesOptions) {
       if (typeof src !== 'string') return;
 
       if (REMOTE_SRC_PATTERN.test(src)) {
-        const nextSrc = remote?.[src]?.url;
-        if (nextSrc) node.properties.src = nextSrc;
+        const entry = remote?.[src];
+        if (entry?.url) {
+          node.properties.src = entry.url;
+          applyDimensions(node, entry);
+        }
         return;
       }
 
@@ -71,9 +83,10 @@ export default function rehypeCdnImages(options?: RehypeCdnImagesOptions) {
 
       const cleanPath = src.replace(/^\.\/+/, '');
       const key = `${kind}/${slug}/${cleanPath}`;
-      const nextSrc = map?.[key]?.url;
-      if (nextSrc) {
-        node.properties.src = nextSrc;
+      const entry = map?.[key];
+      if (entry?.url) {
+        node.properties.src = entry.url;
+        applyDimensions(node, entry);
       } else {
         emitDiagnostic?.({
           code: 'images.manifest_miss',

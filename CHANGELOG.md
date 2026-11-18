@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-18
+
+First stable release. From here the public API follows semantic versioning; see **Stability and versioning** in the README for what that covers.
+
+### Removed
+
+- **Breaking:** the deprecated root re-exports `renderMarkdown`, `renderMarkdownDocument`, `renderMarkdownToHtml`, `parseMarkdownFile`, `createMarkdownProcessor`, `rehypeChartBlocks`, and `rehypeCdnImages`. The root now exports `Featherdown`, `FeatherdownDiagnosticsError`, `libraryId`, and types. Import the helpers from `featherdown/legacy` and the processor and plugins from `featherdown/advanced`.
+- **Breaking (JSR):** the extra JSR subpaths `./parseMarkdownFile`, `./createMarkdownProcessor`, `./rehypeChartBlocks`, `./rehypeCdnImages`, `./renderMarkdown`, `./renderMarkdownToHtml`, and `./libraryId`. JSR now exposes the same four entry points as npm (`.`, `./node`, `./advanced`, `./legacy`), and a test keeps the two in step.
+
 ### Added
 
 - `math` options: `macros` (merged between constructor and per-call options; each parse gets its own copy, so `\gdef` cannot leak between documents), `trust` (default `false`), and `strict` (`"ignore"` by default, `"warn"`, `"error"`).
@@ -13,7 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `subSuperscript` option (default on): `H~2~O` renders `<sub>`, `x^2^` renders `<sup>`.
 - `definitionLists` option (default on): `Term` then `: Definition` renders `<dl>`.
 - `tabs` option (default on): `::::tabs` containing `:::tab[Label]` renders a tablist, tab buttons and panels with ARIA wiring and no behavior. The README has a small script to switch panels. Adds the `tabs.invalid` diagnostic and `assets.features.tabs`.
-- `base.css` styles for tabs (every panel is shown under its label until a group has `data-tabs-ready`), definition lists, and `<sub>`/`<sup>` use browser defaults.
+- `base.css` styles for tabs (every panel is shown under its label until a group has `data-tabs-ready`) and for definition lists.
+- README: a **Stability and versioning** section.
 - `RenderDiagnostic.source` now includes `"math"` and `"tabs"`.
 
 ### Changed

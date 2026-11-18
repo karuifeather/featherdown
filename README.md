@@ -35,7 +35,7 @@ The default entry is browser-safe and does **not** include Mermaid rendering.
 
 ## Rendering Markdown
 
-Use the **`Featherdown`** class as the primary API. Constructor options set defaults; each call to **`parse(markdown, parseOptions?)`** can override them (with a shallow merge and one-level merge for nested groups like `code` and `publishing`).
+Use the **`Featherdown`** class as the primary API. Constructor options set defaults; each call to **`parse(markdown, parseOptions?)`** can override them (with a shallow merge and one-level merge for nested groups like `code`, `headings`, `links`, `images`, `embeds`, and `publishing`).
 
 ```ts
 const featherdown = new Featherdown({
@@ -73,16 +73,17 @@ const result = await featherdown.parse(markdown);
 | **`html`** | Sanitized HTML string. |
 | **`body`** | Markdown body after front matter is stripped when front matter parsing is enabled and a valid block exists; otherwise the full input string. |
 | **`frontmatter`** | Parsed YAML object, or `{}` when absent or when front matter parsing is disabled. |
-| **`metadata`** | Normalized subset of common publishing fields (`title`, `description`, `tags`, etc.) derived from front matter. |
-| **`toc`** | Compact heading list for navigation (`depth`, `text`, `id`). |
-| **`headings`** | Richer heading metadata in document order (includes `hasCustomId`). |
+| **`metadata`** | Normalized subset of common publishing fields (`title`, `description`, `tags`, `draft`, `image`, and others). See [Front matter](#front-matter). |
+| **`toc`** | Compact heading list for navigation (`depth`, `text`, `id`). Filtered by `headings.minDepth` / `maxDepth`. |
+| **`tocTree`** | The same `toc` entries nested under the nearest shallower heading (`children`). Empty when `toc` is empty. |
+| **`headings`** | Richer heading metadata in document order (includes `hasCustomId`). Not affected by `minDepth` / `maxDepth`. |
 | **`excerpt`** | First meaningful plain-text excerpt from rendered flow content, or `null` when disabled or unavailable. |
 | **`wordCount`** / **`estimatedReadingMinutes`** | Derived from the rendered document text (subject to `publishing` options). |
 | **`stats`** | Mirrors `wordCount` and reading time for convenience. |
-| **`diagnostics`** | Non-fatal warnings (for example invalid chart JSON or manifest misses). |
-| **`assets`** | Hints such as **`assets.styles`** (selective package CSS paths) and **`assets.features`** (`math`, `code`, `charts`, `mermaid`). |
+| **`diagnostics`** | Non-fatal warnings (for example invalid chart JSON, manifest misses, or blocked embeds). |
+| **`assets`** | Hints such as **`assets.styles`** (selective package CSS paths) and **`assets.features`** (`math`, `code`, `charts`, `mermaid`, `embeds`). |
 
-`assets.styles` lists **selective** style paths (for example `featherdown/styles/base.css`), not the all-in `featherdown/styles.css` aggregate.
+`assets.styles` and `assets.features` reflect **content actually rendered** in the document, not just which options are enabled. For example, `features.embeds` is `true` only when an embed was emitted, and `features.mermaid` is `true` only on the Node entry when an SVG diagram was produced. `assets.styles` lists **selective** style paths (for example `featherdown/styles/base.css`), not the all-in `featherdown/styles.css` aggregate.
 
 ## Styles
 
@@ -163,6 +164,8 @@ const featherdown = new Featherdown({
   code: {
     enabled: true,
     highlighting: true,
+    lineNumbers: false,
+    copyButton: false,
   },
   publishing: {
     excerpt: true,
@@ -173,9 +176,9 @@ const featherdown = new Featherdown({
 ```
 
 - **`math`** — Toggle KaTeX HTML output for `$…$` / `$$…$$`.
-- **`code`** — Toggle code pipeline features; **`highlighting`** controls whether highlight.js classes and **`highlight.css`** are relevant.
+- **`code`** — Toggle code pipeline features; **`highlighting`** controls whether highlight.js classes and **`highlight.css`** are relevant. **`lineNumbers`** and **`copyButton`** set global defaults for every fence (both default `false`). See [Code blocks](#code-blocks).
 - **`frontmatter`** — `false`, `true`, or `"auto"`; controls whether leading YAML front matter is parsed and stripped from `body`.
-- **`sanitize`** — When enabled, author content (Markdown and raw HTML) passes through `rehype-sanitize` with the package schema **before** Featherdown adds its own markup (KaTeX, code chrome, chart mounts, heading anchors). Raw HTML keeps safe tags and attributes but loses `style`, `<button>`, and any `class` other than `language-*` on `code` and the callout classes on `div`.
+- **`sanitize`** — When enabled, author content (Markdown and raw HTML) passes through `rehype-sanitize` with the package schema **before** Featherdown adds its own markup (KaTeX, code chrome, chart mounts, heading anchors, embeds). Raw HTML keeps safe tags and attributes but loses `style`, `<button>`, and any `class` other than `language-*` on `code`, the callout classes on `div`, and the `details` class on `details` (which is kept).
 - **`diagnostics`** — Controls whether warnings appear on the result and whether strict mode fails the parse.
   - **`false`** — `result.diagnostics` is always `[]` (issues may still be detected internally).
   - **`true`** or **`"warn"`** — Non-fatal diagnostics are returned on `result.diagnostics`; the parse does not throw.
@@ -201,15 +204,43 @@ try {
 }
 ```
 - **`charts`** — When enabled, valid `chart-*` fences become mount placeholders; invalid JSON surfaces diagnostics when diagnostics are enabled.
-- **`headings`** — Controls **`result.headings`** and **`result.toc`** (metadata extracted after render). Heading markup in **`html`** is unchanged; this option gates the arrays on the result.
-  - **`false`** — **`result.headings`** and **`result.toc`** are both empty arrays.
-  - **`true`** — Default heading metadata: both arrays are populated when rendered headings have ids.
-  - **Object** — Shape matches **`FeatherdownHeadingOptions`**: optional **`toc`**. When **`toc`** is **`false`**, **`result.toc`** is empty while **`result.headings`** can still be filled. Heading ids and anchor links are always rendered.
+- **`headings`** — Controls **`result.headings`**, **`result.toc`**, and **`result.tocTree`** (metadata extracted after render). Heading markup in **`html`** is unchanged; this option gates the arrays on the result.
+  - **`false`** — **`result.headings`**, **`result.toc`**, and **`result.tocTree`** are all empty arrays.
+  - **`true`** — Default heading metadata: the arrays are populated when rendered headings have ids.
+  - **Object** — Shape matches **`FeatherdownHeadingOptions`**:
+    - **`toc`** — When **`false`**, **`result.toc`** and **`result.tocTree`** are empty while **`result.headings`** can still be filled.
+    - **`minDepth`** / **`maxDepth`** (1–6; defaults `1` and `6`) — Limit which levels appear in **`toc`** and **`tocTree`**. **`headings`** is unaffected. If `minDepth` is greater than `maxDepth`, the two are swapped.
+  - Heading ids and anchor links are always rendered.
 - **`publishing`** — Gates excerpt, word count, and reading-time fields on the result.
+- **`alerts`** — GitHub-style alerts (`> [!NOTE]`) become callouts. Default **`true`**. See [Callouts](#callouts-admonitions).
+- **`details`** — `:::details[Summary]` collapsible sections. Default **`true`**.
+- **`links`** — External link decoration. **Opt in** (default off). Accepts `true` or an object:
+  - **`rel`** — Default `"noopener noreferrer"`. Tokens are merged without duplicates. `false` leaves `rel` alone.
+  - **`target`** — Default `"_blank"`. `false` leaves `target` alone.
+  - **`internalHosts`** — Hostnames treated as internal and left undecorated. Use an exact host (`example.com`) or a wildcard (`*.example.com`). A wildcard matches **subdomains only**, so `*.example.com` matches `blog.example.com` but not `example.com`.
+  - Absolute `http(s)` links and protocol-relative `//host` links to other hosts are decorated. Relative paths, `#anchors`, and `mailto:` links are never changed.
+- **`images`** — Image output options. **Opt in** (default off). Accepts `true` or an object:
+  - **`lazy`** — Adds `loading="lazy"` (default `true`). Existing `loading` attributes are kept.
+  - **`decoding`** — `"async"` (default), `"sync"`, `"auto"`, or `false` to omit the attribute.
+  - **`figure`** — Default `false`. When `true`, a paragraph containing only one titled image becomes `<figure class="markdown-figure">` with a `<figcaption>` from the title, and the `title` attribute is dropped. Linked images keep the link inside the figure.
+- **`embeds`** — Allowlisted iframes and `::embed` directives. **Opt in** (default off). See [Embeds](#embeds).
+- **`plugins`** — Extra unified plugins: `{ remark?, rehype? }`. See [Security and trust](#security-and-trust).
 
-**`kind`**, **`slug`**, and **`manifest`** (local `map` and optional `remote`) drive manifest-based image URL rewriting—the same shape supported historically on render helpers.
+**`kind`**, **`slug`**, and **`manifest`** (local `map` and optional `remote`) drive manifest-based image URL rewriting—the same shape supported historically on render helpers. Manifest entries may include `width` and `height`; positive values are emitted on the `<img>` to prevent layout shift.
 
-Avoid treating every nested field on `FeatherdownOptions` as a global behavioral switch unless documented below (for example line numbers and copy UI remain **per-fence** in Markdown).
+Avoid treating every nested field on `FeatherdownOptions` as a global behavioral switch unless documented below.
+
+```ts
+const featherdown = new Featherdown({
+  alerts: true,
+  details: true,
+  links: { internalHosts: ["example.com", "*.example.com"] },
+  images: { lazy: true, decoding: "async", figure: true },
+  embeds: { providers: ["youtube", "vimeo"], allowHosts: [] },
+  code: { lineNumbers: false, copyButton: false },
+  headings: { minDepth: 2, maxDepth: 4 },
+});
+```
 
 ## Front matter
 
@@ -235,6 +266,23 @@ Then:
 - `result.body` — Markdown after the front matter block
 - `result.html` — Rendered from `body` only
 
+**Metadata fields.** `result.metadata` is a typed subset of front matter. Values of the wrong type are omitted (they stay on `result.frontmatter`). Where several keys are listed, the first usable one wins.
+
+| Metadata | Source keys |
+| --- | --- |
+| `title`, `author`, `status`, `slug` | Same name. Must be a string. |
+| `description` | `description`, then `summary`, then `excerpt`. |
+| `date` | `date`. |
+| `updated` | `updated`, then `lastmod`, then `modified`. |
+| `draft` | Boolean `draft`. Otherwise `status: draft` sets `true`. An explicit `draft` wins over `status`. |
+| `tags`, `categories` | A string (one entry) or an array of strings. Anything else is omitted. |
+| `image` | `image`, then `cover`, then `ogImage`. Each may be a string or an object with a string `src` or `url`. |
+| `canonical` | `canonical`, then `canonicalUrl`, then `canonical_url`. |
+| `lang` | `lang`, then `language`. |
+| `keywords` | A comma-separated string (trimmed, empty entries dropped) or an array of strings. |
+
+**Dates.** Unquoted YAML dates such as `date: 2026-01-02` are parsed by YAML as `Date` values; they are normalized to `YYYY-MM-DD` in `metadata`. Values with a time component become a full ISO string (for example `2026-01-02T10:30:00.000Z`). Quoted dates such as `"Jan 2, 2026"` pass through unchanged. `result.frontmatter.date` keeps the raw parsed value.
+
 **Lenient behavior:** invalid or non-mapping YAML does not throw; the raw document is treated as body content with empty `frontmatter` / `metadata` where applicable.
 
 **Strict legacy utility:** `parseMarkdownFile()` still throws on invalid YAML and returns **`frontMatter`** / **`content`**. Use it only when you need that contract; otherwise prefer `Featherdown` with `frontmatter: "auto"`.
@@ -243,9 +291,24 @@ Then:
 
 - **Fenced code** renders as sanitized `<pre><code>` with highlight.js classes when highlighting is on.
 - **Titles:** ` ```ts title="example.ts" ` — emits `code-block` / `code-block-title` markup.
-- **Line highlights:** ` ```ts {2,4-5} ` — `code-line` / `code-line-highlighted` wrappers.
-- **Line numbers:** ` ```ts showLineNumbers ` — `code-line-numbered` and per-line number spans (per fence).
-- **Copy UI hooks:** `showCopyButton` / `copyButton` on the fence emit button markup and `data-*` attributes for your app to wire up. **The package does not ship clipboard JavaScript.**
+- **Line highlights:** ` ```ts {2,4-5} ` — `code-line` / `code-line-highlighted` wrappers. Highlight numbers are relative to the block, even when numbering starts elsewhere.
+- **Line numbers:** ` ```ts showLineNumbers ` — `code-line-numbered` and per-line number spans.
+  - ` ```ts showLineNumbers=10 ` starts numbering at `10`.
+  - Set `code: { lineNumbers: true }` on the instance to number **every** fence by default (default `false`).
+  - A fence can opt out with `noLineNumbers` or `showLineNumbers=false`.
+- **Copy UI hooks:** ` ```ts showCopyButton ` (or `copyButton`) emits the button markup and `data-*` attributes for your app to wire up. Set `code: { copyButton: true }` to add it to **every** fence (default `false`). A fence can opt out with `noCopyButton` or `showCopyButton=false`. **The package does not ship clipboard JavaScript.**
+- **Diff:** ` ```diff ` marks lines that start with `+` as `code-line-added` and lines that start with `-` as `code-line-removed`. The markers are kept in the output.
+- **Diff on other languages:** ` ```ts diff ` applies the same line marking to a highlighted block. The `+` / `-` markers are stripped and the code is still highlighted.
+- **Composition:** titles, highlights, line numbers, and diff marking can be combined in one info string:
+
+````md
+```ts diff title="x.ts" {1} showLineNumbers=3
+-a
++b
+```
+````
+
+- Chart fences (`chart-*`) and Mermaid fences never receive line numbers or copy chrome, even when the global defaults are on.
 
 Styling for these contracts comes from **`code.css`** and **`highlight.css`** (when highlighting is enabled).
 
@@ -271,13 +334,221 @@ Valid `chart-*` fenced JSON becomes a **`chart-mount`** placeholder with `data-c
 
 `:::note`, `:::warning`, `:::tip`, etc. (with optional `:::type[Title]`) render to **`callout`** / **`callout-<type>`** structures. Body markdown is processed normally.
 
-### Images
+GitHub-style alerts map to the same callout classes. The marker is case-insensitive and must be the first line of the blockquote. The supported types are `NOTE`, `TIP`, `IMPORTANT`, `WARNING`, and `CAUTION`. An optional custom title follows the marker on the same line:
 
-Optional **`manifest`** + **`kind`** + **`slug`** rewrite relative `![alt](./path)` sources using deterministic keys. No CDN fetching is built in.
+```md
+> [!NOTE]
+> Useful context.
+
+> [!TIP] Pro tip
+> Body text with **inline** markdown.
+```
+
+A marker with no text renders a callout titled with the type name. Unknown markers (for example `[!FOO]`) and markers that are not on the first line leave an ordinary `<blockquote>`. Alerts are on by default; set `alerts: false` to disable them.
+
+Collapsible sections use `:::details`:
+
+```md
+:::details[More info]{open}
+Hidden **content**.
+:::
+```
+
+This renders `<details class="details" open>` with a `<summary>`. The summary defaults to `Details` when omitted. Callouts and alerts can be nested inside details. Set `details: false` to leave the directive as plain text.
+
+### Footnotes
+
+GFM footnotes (`text[^1]` and `[^1]: note`) render with working links between the reference and the note, and the links resolve within the document. The footnotes section is excluded from `toc`, `headings`, and `excerpt`, and footnote markers are stripped from the excerpt.
+
+### Embeds
+
+See [Embeds](#embeds).
 
 ### TOC, excerpt, counts
 
-`toc`, `headings`, `excerpt`, `wordCount`, and `estimatedReadingMinutes` come from the **same** render pass as `html`, gated by **`headings`** and **`publishing`** options.
+`toc`, `tocTree`, `headings`, `excerpt`, `wordCount`, and `estimatedReadingMinutes` come from the **same** render pass as `html`, gated by **`headings`** and **`publishing`** options.
+
+## Embeds
+
+Embeds are **opt in**. Enable them with `embeds: true` (all built-in providers) or with an object:
+
+```ts
+const featherdown = new Featherdown({
+  embeds: {
+    providers: ["youtube", "vimeo"], // default: all built-in providers
+    allowHosts: [], // extra https hosts; see the warning below
+  },
+});
+```
+
+With embeds off (the default), raw `<iframe>` elements and `::embed` directives are removed.
+
+### Directives (preferred)
+
+Directives let the package build the provider URL for you:
+
+```md
+::youtube{id="dQw4w9WgXcQ" title="Launch video"}
+
+::vimeo[Conference talk]{id="76979871"}
+
+::embed{src="https://codepen.io/some-user/embed/AbCdEf?default-tab=result" title="Demo"}
+```
+
+- `::youtube{id}` takes an 11-character YouTube id and builds a `youtube-nocookie.com` URL.
+- `::vimeo{id}` takes a numeric Vimeo id. A label in brackets (`[Conference talk]`) is used as the title.
+- `::embed{src}` takes a full `https` URL and runs the same host checks as a raw iframe.
+- `title` is optional on every directive.
+
+Directives accept only the attributes listed above. Other attributes, including `class`, `style`, and event handlers, are ignored.
+
+### Raw iframes
+
+A raw `<iframe>` is kept only when its `src` matches the same allowlist:
+
+```html
+<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Launch video"></iframe>
+```
+
+### Built-in providers
+
+| Provider | Accepted URL shape |
+| --- | --- |
+| `youtube` | `/embed/<id>` on `youtube.com` or `youtube-nocookie.com` |
+| `vimeo` | `player.vimeo.com/video/<digits>` |
+| `codepen` | `codepen.io/<user>/embed/...` (including `embed/preview/...`) |
+| `codesandbox` | `codesandbox.io/embed/<id>` |
+| `stackblitz` | `stackblitz.com/edit/<id>?embed=1` |
+
+Every URL must be `https`. Credentials, look-alike domains (for example `youtube.com.evil.com`), and paths outside the provider's embed shape are rejected.
+
+### Hardening
+
+Every embed that renders is wrapped in `div.embed.embed-<provider>` (`embed-custom` for `allowHosts`). The `<iframe>` inside it:
+
+- has `loading="lazy"` and `referrerpolicy="strict-origin-when-cross-origin"`;
+- has a `sandbox` attribute set by Featherdown. Built-in providers get the permissions they need. `allowHosts` entries get `allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation` and no `allow` permissions policy. No provider is granted top-level navigation;
+- has a default `title` ("Embedded content") when the author omits one.
+
+Author-supplied `srcdoc`, event handlers, `style`, `name`, `id`, `class`, `sandbox`, and `allow` are removed, and iframe children (fallback text, scripts) are dropped.
+
+### Diagnostics
+
+Rejected embeds produce non-fatal diagnostics on `result.diagnostics` with `source: "embeds"`:
+
+- **`embeds.blocked`** — A raw iframe or `::embed` URL did not match the allowlist, or an iframe had no `src`.
+- **`embeds.invalid`** — A directive had malformed input. Malformed directives may report either code.
+
+With `diagnostics: "strict"`, any embed diagnostic makes `parse()` throw `FeatherdownDiagnosticsError`.
+
+`result.assets.features.embeds` is `true` only when an embed was actually rendered.
+
+> **Warning:** `allowHosts` should list only **third-party** hosts that serve the embed. Embed iframes receive `allow-scripts allow-same-origin`, so an entry that points at **your own site's origin** would let embedded content run as your site and read its storage and cookies. Never add your own domain. `allowHosts` entries are exact hostnames or `*.example.com` wildcards; URLs, paths, `*`, and bare TLD wildcards like `*.com` are ignored.
+
+## Advanced and compatibility APIs
+
+### `featherdown/advanced`
+
+The advanced subpath is for **existing low-level unified integrations**. Most applications should use **`Featherdown`**. The subpath exists for **existing unified pipelines** and low-level compatibility:
+
+```ts
+import {
+  createMarkdownProcessor,
+  rehypeChartBlocks,
+  rehypeCdnImages,
+} from "featherdown/advanced";
+```
+
+The same symbols are still re-exported from the **root** package, but those root re-exports are **deprecated** and will be removed in a future minor release—import them from **`featherdown/advanced`**.
+
+### Legacy function exports (`featherdown/legacy`)
+
+Older helpers (`renderMarkdownToHtml`, `renderMarkdown`, `renderMarkdownDocument`, `parseMarkdownFile`) live in **`featherdown/legacy`**:
+
+```ts
+import { renderMarkdownToHtml } from "featherdown/legacy";
+```
+
+They are still re-exported from the package root, marked **`@deprecated`**, for one more minor release; switch imports to **`featherdown/legacy`** (or migrate to **`Featherdown`**) before the root re-exports are removed. They take **`RenderMarkdownOptions`**, not the full **`FeatherdownOptions`** surface (for example **`math`**, **`code`**, **`charts`**, **`frontmatter`**, **`alerts`**, **`links`**, **`images`**, **`embeds`**, and **`diagnostics: "strict"`** are **`Featherdown`** features). Their output does not include these enhancements. Prefer **`new Featherdown().parse()`** for new code.
+
+## Migration from legacy helpers
+
+Legacy helpers remain available for compatibility, but new code should use **`Featherdown`**.
+
+For default rendering behavior (what the legacy helpers covered under **`RenderMarkdownOptions`**), the closest migration is:
+
+```ts
+// Before
+const html = await renderMarkdownToHtml(markdown);
+
+// After
+const { html } = await new Featherdown().parse(markdown);
+```
+
+> **Migration note:** The legacy helpers are kept for compatibility and use the older **`RenderMarkdownOptions`** surface. They are not a full alias for **`FeatherdownOptions`**. For feature gates such as **`math`**, **`code`**, **`charts`**, **`frontmatter`**, **`alerts`**, **`links`**, **`images`**, **`embeds`**, and **`diagnostics: "strict"`**, use the **`Featherdown`** class.
+
+| Legacy | Prefer |
+| --- | --- |
+| `renderMarkdownToHtml(md, opts)` | `(await new Featherdown().parse(md)).html` — legacy **`opts`** only apply the older options shape; pass **`FeatherdownOptions`** on **`Featherdown`** when you need feature gates |
+| `renderMarkdown(md, opts)` | `await new Featherdown().parse(md)` — use **`r.html`** and **`r.diagnostics`**; same **`RenderMarkdownOptions`** limitation as above |
+| `renderMarkdownDocument(md, opts)` | `await new Featherdown().parse(md)` for the default document pipeline when **`opts`** are legacy **`RenderMarkdownOptions`**. The **`Featherdown`** result adds **`body`**, **`frontmatter`**, **`assets`**, and related fields—configure **`Featherdown`** directly if you need **`FeatherdownOptions`** (not understood by the helper) |
+| `parseMarkdownFile(md)` | `new Featherdown({ frontmatter: "auto" }).parse(md)` returns **`frontmatter`**, **`metadata`**, **`body`**, and **`html`** in one result. Keep **`parseMarkdownFile`** only when you need its strict **`{ frontMatter, content }`** contract |
+| `renderMarkdownToHtmlWithMermaid(md, opts)` (Node) | `new Featherdown({ mermaid: { render: "svg" } }).parse(md)` then read **`html`** from **`featherdown/node`** — add **`kind`**, **`manifest`**, and other options in the same object as needed; **do not spread** an options object that might already define **`mermaid`** (merge carefully or use a dedicated instance). Legacy **`opts`** remain **`RenderMarkdownOptions`**-shaped |
+| `createMarkdownProcessor(opts)` | **`Featherdown`** for normal use; **`featherdown/advanced`** only for custom unified graphs |
+
+**Strict diagnostics:** **`diagnostics: "strict"`** exists only on **`Featherdown`**; legacy render helpers do not use it.
+
+## Styling reference (HTML contracts)
+
+Rendered output uses stable classes including:
+
+- **Article surface:** wrap content in **`featherdown-content`** (see shipped CSS).
+- **Callouts:** `callout`, `callout-<type>`, `callout-title`
+- **Details:** `details` (on `<details>`)
+- **Code:** `code-block`, `code-block-title`, `code-line`, `code-line-highlighted`, `code-line-added`, `code-line-removed`, `code-line-numbered`, `code-line-number`, `code-block-copyable`, `code-block-copy-button`
+- **Charts:** `chart-mount`
+- **Images:** `markdown-inline-img`, `markdown-figure` (on `<figure>`)
+- **Embeds:** `embed` and `embed-<provider>` (`youtube`, `vimeo`, `codepen`, `codesandbox`, `stackblitz`, or `custom`)
+
+## Security and trust
+
+- Input is sanitized (`rehype-sanitize`) before any Featherdown plugin runs, so only Featherdown's own output carries inline styles (KaTeX layout) or package classes. Raw HTML cannot set `style`, add arbitrary classes, or create buttons.
+- Scripts, event handlers, and `javascript:` URLs are stripped.
+- Prefer the **default** entry for untrusted user content.
+- The **Node Mermaid** path sanitizes diagram SVG too, but Mermaid itself executes diagram source in headless Chromium; it is better suited to **trusted** publishing inputs.
+- **Embeds** are off by default. When enabled, they are limited to the provider and host allowlists above. Do not add your own site's origin to `allowHosts`, because embeds run with `allow-same-origin`.
+- **User plugins:** `plugins.remark` runs before HTML conversion, so its output is still sanitized. `plugins.rehype` runs **after** sanitization, right before serialization, and its output is **not** sanitized. Treat rehype plugins as trusted code, and never build them from user input.
+
+```ts
+const featherdown = new Featherdown({
+  plugins: {
+    remark: [myRemarkPlugin], // output is still sanitized
+    rehype: [myRehypePlugin], // trusted: runs after sanitize
+  },
+});
+```
+
+## Runtime boundaries
+
+| Entry | Role |
+| --- | --- |
+| **`featherdown`** | Browser-safe; no Mermaid / Playwright in the default bundle. |
+| **`featherdown/node`** | Node **`Featherdown`**, optional Mermaid SVG, **`parseFile`**. |
+| **`featherdown/advanced`** | Processor + rehype plugins for unified integrations. |
+| **`featherdown/legacy`** | Deprecated pre-`Featherdown` helper functions. |
+
+`featherdown/node` (including Mermaid) is also available from JSR as `@karuifeather/featherdown/node`; Mermaid still needs the Playwright / Chromium setup.
+
+### Client-side Mermaid previews
+
+The default `featherdown` entry does not render Mermaid in the browser. If your app needs live Mermaid previews, parse Markdown first, then hydrate `code.language-mermaid` blocks with the `mermaid` package in your own app code. This keeps Mermaid out of Featherdown's browser bundle. Use `featherdown/node` when you want build-time SVG output.
+
+```ts
+import mermaid from "mermaid";
+
+const result = await featherdown.parse(markdown);
+mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
+```
 
 ## Node usage
 
@@ -316,98 +587,6 @@ const result = await featherdown.parse(markdown);
 - The Node Mermaid pipeline is the default pipeline plus a Mermaid stage: author content gets the same strict sanitize pass, then Mermaid SVG output gets a second, **SVG-aware sanitize** pass. Non-Mermaid output matches the browser entry.
 
 The default **`featherdown`** entry remains Mermaid-free for bundle safety.
-
-## Advanced and compatibility APIs
-
-### `featherdown/advanced`
-
-The advanced subpath is for **existing low-level unified integrations**. Most applications should use **`Featherdown`**. The subpath exists for **existing unified pipelines** and low-level compatibility:
-
-```ts
-import {
-  createMarkdownProcessor,
-  rehypeChartBlocks,
-  rehypeCdnImages,
-} from "featherdown/advanced";
-```
-
-The same symbols are still re-exported from the **root** package, but those root re-exports are **deprecated** and will be removed in a future minor release—import them from **`featherdown/advanced`**.
-
-### Legacy function exports (`featherdown/legacy`)
-
-Older helpers (`renderMarkdownToHtml`, `renderMarkdown`, `renderMarkdownDocument`, `parseMarkdownFile`) live in **`featherdown/legacy`**:
-
-```ts
-import { renderMarkdownToHtml } from "featherdown/legacy";
-```
-
-They are still re-exported from the package root, marked **`@deprecated`**, for one more minor release; switch imports to **`featherdown/legacy`** (or migrate to **`Featherdown`**) before the root re-exports are removed. They take **`RenderMarkdownOptions`**, not the full **`FeatherdownOptions`** surface (for example **`math`**, **`code`**, **`charts`**, **`frontmatter`**, and **`diagnostics: "strict"`** are **`Featherdown`** features). Prefer **`new Featherdown().parse()`** for new code.
-
-## Migration from legacy helpers
-
-Legacy helpers remain available for compatibility, but new code should use **`Featherdown`**.
-
-For default rendering behavior (what the legacy helpers covered under **`RenderMarkdownOptions`**), the closest migration is:
-
-```ts
-// Before
-const html = await renderMarkdownToHtml(markdown);
-
-// After
-const { html } = await new Featherdown().parse(markdown);
-```
-
-> **Migration note:** The legacy helpers are kept for compatibility and use the older **`RenderMarkdownOptions`** surface. They are not a full alias for **`FeatherdownOptions`**. For feature gates such as **`math`**, **`code`**, **`charts`**, **`frontmatter`**, and **`diagnostics: "strict"`**, use the **`Featherdown`** class.
-
-| Legacy | Prefer |
-| --- | --- |
-| `renderMarkdownToHtml(md, opts)` | `(await new Featherdown().parse(md)).html` — legacy **`opts`** only apply the older options shape; pass **`FeatherdownOptions`** on **`Featherdown`** when you need feature gates |
-| `renderMarkdown(md, opts)` | `await new Featherdown().parse(md)` — use **`r.html`** and **`r.diagnostics`**; same **`RenderMarkdownOptions`** limitation as above |
-| `renderMarkdownDocument(md, opts)` | `await new Featherdown().parse(md)` for the default document pipeline when **`opts`** are legacy **`RenderMarkdownOptions`**. The **`Featherdown`** result adds **`body`**, **`frontmatter`**, **`assets`**, and related fields—configure **`Featherdown`** directly if you need **`FeatherdownOptions`** (not understood by the helper) |
-| `parseMarkdownFile(md)` | `new Featherdown({ frontmatter: "auto" }).parse(md)` returns **`frontmatter`**, **`metadata`**, **`body`**, and **`html`** in one result. Keep **`parseMarkdownFile`** only when you need its strict **`{ frontMatter, content }`** contract |
-| `renderMarkdownToHtmlWithMermaid(md, opts)` (Node) | `new Featherdown({ mermaid: { render: "svg" } }).parse(md)` then read **`html`** from **`featherdown/node`** — add **`kind`**, **`manifest`**, and other options in the same object as needed; **do not spread** an options object that might already define **`mermaid`** (merge carefully or use a dedicated instance). Legacy **`opts`** remain **`RenderMarkdownOptions`**-shaped |
-| `createMarkdownProcessor(opts)` | **`Featherdown`** for normal use; **`featherdown/advanced`** only for custom unified graphs |
-
-**Strict diagnostics:** **`diagnostics: "strict"`** exists only on **`Featherdown`**; legacy render helpers do not use it.
-
-## Styling reference (HTML contracts)
-
-Rendered output uses stable classes including:
-
-- **Article surface:** wrap content in **`featherdown-content`** (see shipped CSS).
-- **Callouts:** `callout`, `callout-<type>`, `callout-title`
-- **Code:** `code-block`, `code-block-title`, `code-line`, `code-line-highlighted`, `code-line-numbered`, `code-line-number`, `code-block-copyable`, `code-block-copy-button`
-- **Charts:** `chart-mount`
-- **Images:** `markdown-inline-img`
-
-## Security and trust
-
-- Input is sanitized (`rehype-sanitize`) before any Featherdown plugin runs, so only Featherdown's own output carries inline styles (KaTeX layout) or package classes. Raw HTML cannot set `style`, add arbitrary classes, or create buttons.
-- Scripts, event handlers, and `javascript:` URLs are stripped.
-- Prefer the **default** entry for untrusted user content.
-- The **Node Mermaid** path sanitizes diagram SVG too, but Mermaid itself executes diagram source in headless Chromium; it is better suited to **trusted** publishing inputs.
-
-## Runtime boundaries
-
-| Entry | Role |
-| --- | --- |
-| **`featherdown`** | Browser-safe; no Mermaid / Playwright in the default bundle. |
-| **`featherdown/node`** | Node **`Featherdown`**, optional Mermaid SVG, **`parseFile`**. |
-| **`featherdown/advanced`** | Processor + rehype plugins for unified integrations. |
-| **`featherdown/legacy`** | Deprecated pre-`Featherdown` helper functions. |
-
-`featherdown/node` (including Mermaid) is also available from JSR as `@karuifeather/featherdown/node`; Mermaid still needs the Playwright / Chromium setup.
-
-### Client-side Mermaid previews
-
-The default `featherdown` entry does not render Mermaid in the browser. If your app needs live Mermaid previews, parse Markdown first, then hydrate `code.language-mermaid` blocks with the `mermaid` package in your own app code. This keeps Mermaid out of Featherdown's browser bundle. Use `featherdown/node` when you want build-time SVG output.
-
-```ts
-import mermaid from "mermaid";
-
-const result = await featherdown.parse(markdown);
-mermaid.initialize({ startOnLoad: false, securityLevel: "strict" });
-```
 
 ## Public API (summary)
 

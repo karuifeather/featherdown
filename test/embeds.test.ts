@@ -370,9 +370,11 @@ describe('embeds pipeline integrity', () => {
     expect(on.html).toContain('src="http://example.com/a.png"');
   });
 
-  it('reports the embeds asset feature', async () => {
-    expect((await parse('x\n')).assets.features.embeds).toBe(true);
-    expect((await parse('x\n', {})).assets.features.embeds).toBe(false);
+  it('reports the embeds asset feature only when an embed rendered', async () => {
+    expect((await parse('::youtube{id="dQw4w9WgXcQ"}\n')).assets.features.embeds).toBe(true);
+    expect((await parse('x\n')).assets.features.embeds).toBe(false);
+    expect((await parse(`${iframe('https://evil.com/x')}\n`)).assets.features.embeds).toBe(false);
+    expect((await parse('::youtube{id="dQw4w9WgXcQ"}\n', {})).assets.features.embeds).toBe(false);
   });
 
   it('Node entry without mermaid behaves identically', async () => {

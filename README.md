@@ -35,7 +35,7 @@ The default entry is browser-safe and does **not** include Mermaid rendering.
 
 ## Rendering Markdown
 
-Use the **`Featherdown`** class as the primary API. Constructor options set defaults; each call to **`parse(markdown, parseOptions?)`** can override them (with a shallow merge and one-level merge for nested groups like `code`, `headings`, `links`, `images`, `embeds`, and `publishing`).
+Use the **`Featherdown`** class as the primary API. Constructor options set defaults; each call to **`parse(markdown, parseOptions?)`** can override them (with a shallow merge and one-level merge for nested groups like `code`, `headings`, `links`, `images`, `embeds`, and `publishing`). Passing `true` for a group keeps the constructor's settings for it; passing an object for a `math` / `code` group the constructor disabled keeps it disabled unless the object sets `enabled: true`. Plugin lists concatenate (constructor first).
 
 ```ts
 const featherdown = new Featherdown({

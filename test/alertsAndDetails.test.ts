@@ -122,3 +122,13 @@ describe('raw HTML cannot spoof', () => {
     expect(html).not.toContain('class="details"');
   });
 });
+
+describe('alert titles with inline markup', () => {
+  it('uses the plain text of the whole marker line as the title', async () => {
+    const { Featherdown } = await import('../src/index.js');
+    const { html } = await new Featherdown().parse('> [!NOTE] **Heads** up `now`\n> body text\n');
+    expect(html).toContain('<div class="callout-title">Heads up now</div>');
+    expect(html).toContain('<p>body text</p>');
+    expect(html).not.toContain('<strong>Heads</strong>');
+  });
+});

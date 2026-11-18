@@ -188,7 +188,11 @@ export function createMarkdownProcessorInternal(options?: InternalProcessorOptio
   processor.use(rehypeSlug).use(rehypeAutolinkHeadings, { behavior: 'wrap' });
 
   if (gates.code && gates.codeHighlighting) {
-    processor.use(rehypeHighlight).use(rehypeCodeLineHighlights);
+    processor.use(rehypeHighlight);
+  }
+  // Line wrappers (highlights, numbers, diff) don't depend on hljs tokens.
+  if (gates.code) {
+    processor.use(rehypeCodeLineHighlights);
   }
 
   if (!options?.preserveHeadingCustomIdMarker) {

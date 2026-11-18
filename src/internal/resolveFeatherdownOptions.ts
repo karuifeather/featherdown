@@ -105,18 +105,40 @@ const DEFAULT_PUBLISHING: ResolvedFeatherdownOptions['publishing'] = {
   readingTime: true,
 };
 
-/** One-level merge of a `boolean | object` option group; parse wins. */
-function mergeGroup<T extends object>(ctor?: boolean | T, parse?: boolean | T): boolean | T | undefined {
-  if (parse !== undefined) {
-    if (typeof parse === 'boolean') {
-      return parse;
-    }
-    if (ctor !== undefined && typeof ctor === 'object') {
-      return { ...ctor, ...parse };
-    }
-    return { ...parse };
+/**
+ * One-level merge of a `boolean | object` option group; parse wins.
+ *
+ * - parse `true` + ctor object: keep the ctor's settings (re-enabling them).
+ * - parse object + ctor `false`: the group stays disabled unless the parse
+ *   object sets `enabled: true` (groups without an `enabled` field, such as
+ *   links / images / embeds, are enabled by passing an object).
+ * - both objects: shallow merge.
+ */
+function mergeGroup<T extends object>(
+  ctor: boolean | T | undefined,
+  parse: boolean | T | undefined,
+  hasEnabledField: boolean,
+): boolean | T | undefined {
+  if (parse === undefined) {
+    return ctor;
   }
-  return ctor;
+  if (parse === false) {
+    return false;
+  }
+  if (parse === true) {
+    if (ctor !== undefined && typeof ctor === 'object') {
+      return hasEnabledField ? { ...ctor, enabled: true } : { ...ctor };
+    }
+    return true;
+  }
+  // Tuning a disabled group (math / code) does not silently turn it back on.
+  if (ctor === false && hasEnabledField && (parse as { enabled?: unknown }).enabled === undefined) {
+    return { ...parse, enabled: false };
+  }
+  if (ctor !== undefined && typeof ctor === 'object') {
+    return { ...ctor, ...parse };
+  }
+  return { ...parse };
 }
 
 /**
@@ -135,8 +157,10 @@ export function mergeFeatherdownOptions(
   const out: FeatherdownOptions = { ...constructorOptions, ...parseOptions };
 
   const groups = ['math', 'code', 'headings', 'publishing', 'links', 'images', 'embeds'] as const;
+  // Groups whose object form carries an `enabled` switch.
+  const withEnabledField = new Set<string>(['math', 'code']);
   for (const key of groups) {
-    const merged = mergeGroup<object>(constructorOptions?.[key], parseOptions?.[key]);
+    const merged = mergeGroup<object>(constructorOptions?.[key], parseOptions?.[key], withEnabledField.has(key));
     if (merged !== undefined) {
       (out as Record<string, unknown>)[key] = merged;
     }
@@ -147,10 +171,14 @@ export function mergeFeatherdownOptions(
     const rehype = [...(constructorOptions?.plugins?.rehype ?? []), ...(parseOptions?.plugins?.rehype ?? [])];
     // Keep the constructor's object identity when the parse call adds nothing,
     // so the processor cache can reuse the instance's processor.
+    // Keep object identity when only one side has plugins, so the processor
+    // cache (keyed by the plugins object) hits across parse calls.
     out.plugins =
       parseOptions?.plugins === undefined && constructorOptions?.plugins
         ? constructorOptions.plugins
-        : { remark, rehype };
+        : constructorOptions?.plugins === undefined && parseOptions?.plugins
+          ? parseOptions.plugins
+          : { remark, rehype };
   }
 
   return out;

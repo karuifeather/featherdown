@@ -112,3 +112,12 @@ describe('front matter dates', () => {
     expect(r.metadata.date).toBe('Jan 2, 2026');
   });
 });
+
+describe('footnote links beat colliding author ids', () => {
+  it('points footnote refs at the footnote even when a heading slug is fn-1', async () => {
+    const { html } = await new Featherdown().parse('Text[^1]\n\n## fn 1\n\n[^1]: note\n');
+    expect(html).toContain('<h2 id="fn-1">');
+    expect(html).toMatch(/<a href="#user-content-fn-1"[^>]*data-footnote-ref/);
+    expect(html).toContain('href="#user-content-fnref-1"');
+  });
+});

@@ -1,6 +1,7 @@
 import type { Code, Root } from 'mdast';
 import { visit } from 'unist-util-visit';
 import type { Plugin } from 'unified';
+import { getPipelineContext } from './pipelineContext.js';
 
 const CHART_LANGUAGE_PREFIX = 'chart-';
 const TITLE_META_PATTERN = /(?:^|\s)title="([^"]*)"(?:\s|$)/;
@@ -18,6 +19,10 @@ const NO_LINE_NUMBERS_PATTERN = /(?:^|\s)noLineNumbers(?=\s|$)/;
 const COPY_BUTTON_PATTERN = /(?:^|\s)(?:showCopyButton|copyButton)(?:=(false))?(?=\s|$)/;
 const NO_COPY_BUTTON_PATTERN = /(?:^|\s)noCopyButton(?=\s|$)/;
 const DIFF_FLAG_PATTERN = /(?:^|\s)diff(?=\s|$)/;
+// Legacy helpers (no per-parse config) keep the pre-0.5 flag grammar exactly:
+// bare flags only, no `=N` / `=false` / `no*` / `diff`.
+const LEGACY_LINE_NUMBERS_PATTERN = /(?:^|\s)(?:showLineNumbers|lineNumbers)(?:\s|$)/;
+const LEGACY_COPY_BUTTON_PATTERN = /(?:^|\s)(?:showCopyButton|copyButton)(?:\s|$)/;
 
 function getCodeBlockTitle(meta: unknown): string | undefined {
   if (typeof meta !== 'string') {
@@ -138,17 +143,28 @@ function extractDiffMarkers(node: Code): string | undefined {
  * Extracts supported fenced code metadata and stores it on hProperties.
  */
 export const remarkCodeBlockTitles: Plugin<[], Root> = function remarkCodeBlockTitles() {
-  return (tree): undefined => {
+  return (tree, file): undefined => {
+    // Featherdown parses carry per-parse config; legacy helpers do not.
+    const modern = getPipelineContext(file)?.config !== undefined;
     visit(tree, 'code', (node: Code) => {
       if (typeof node.lang === 'string' && node.lang.startsWith(CHART_LANGUAGE_PREFIX)) {
         return;
       }
 
+      const meta = typeof node.meta === 'string' ? node.meta : '';
       const title = getCodeBlockTitle(node.meta);
       const highlights = getCodeBlockHighlightLines(node.meta);
-      const lineNumbers = getCodeBlockLineNumbers(node.meta);
-      const copyButton = getCodeBlockCopyButton(node.meta);
-      const diffMarkers = extractDiffMarkers(node);
+      const lineNumbers = modern
+        ? getCodeBlockLineNumbers(node.meta)
+        : LEGACY_LINE_NUMBERS_PATTERN.test(meta)
+          ? true
+          : undefined;
+      const copyButton = modern
+        ? getCodeBlockCopyButton(node.meta)
+        : LEGACY_COPY_BUTTON_PATTERN.test(meta)
+          ? true
+          : undefined;
+      const diffMarkers = modern ? extractDiffMarkers(node) : undefined;
       if (
         title === undefined &&
         highlights.length === 0 &&

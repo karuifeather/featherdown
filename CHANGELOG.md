@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Code line highlights `{n}`, line numbers and `diff` lines now work with `code: { highlighting: false }`.
+- GitHub alert titles keep inline-formatted text (`> [!NOTE] **Heads up**`).
+- Footnote references always link to the footnote, even when a heading slug matches the footnote id.
 - Footnote links no longer receive a doubled `user-content-` prefix, so every `#fragment` to a footnote resolves.
 - Node Mermaid output no longer re-prefixes every id in the document. Only the Mermaid SVG is re-sanitized, and Node output matches the browser entry for non-Mermaid content.
 - The footnotes heading is excluded from `toc` and `headings`.
@@ -40,4 +43,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Behavior:** `metadata.tags` accepts a single string as well as an array.
 - **Behavior:** raw `<details class="details">` keeps its `details` class. The class is dropped on other elements.
 - **Dependencies:** `hast-util-sanitize` is a direct dependency.
-- Legacy helpers (`featherdown/legacy`) keep their output, with two exceptions: manifest `width` / `height` are emitted when supplied, and raw `<details class="details">` keeps its class.
+- Legacy helpers (`featherdown/legacy`) get none of the new features (alerts, details, links, images, embeds, the new fence flags, `diff` lines). Their output changes only through:
+  - the bug fixes above (footnote ids and links, links to `{#custom}` heading ids now resolve, the footnotes heading leaves `toc`/`headings`, cleaner excerpts, Node Mermaid ids no longer triple-prefixed);
+  - manifest `width` / `height`, emitted when supplied;
+  - raw `<details class="details">` keeping its class.
+- Option merging: `parse(md, { group: true })` now keeps the constructor's settings for that group instead of resetting them to defaults, and tuning a group disabled on the constructor (`code: false`, then `{ code: { lineNumbers: true } }`) keeps it disabled unless `enabled: true` is passed.

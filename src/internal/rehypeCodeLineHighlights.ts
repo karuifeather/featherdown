@@ -128,7 +128,10 @@ function isEmptyLine(line: ElementContent[]): boolean {
 const rehypeCodeLineHighlights: Plugin<[], Root> = function rehypeCodeLineHighlights() {
   return (tree, file): undefined => {
     // Read per parse: the processor is cached and shared across parses.
-    const globalLineNumbers = getPipelineContext(file)?.config?.code?.lineNumbers === true;
+    const config = getPipelineContext(file)?.config;
+    const globalLineNumbers = config?.code?.lineNumbers === true;
+    // `diff` language line classes are a Featherdown (0.5+) feature; legacy helpers have no config.
+    const diffEnabled = config !== undefined;
     visit(tree, 'element', (node) => {
       if (node.tagName !== 'code') return;
       if (hasChartLanguage(node.properties.className)) return;
@@ -147,7 +150,7 @@ const rehypeCodeLineHighlights: Plugin<[], Root> = function rehypeCodeLineHighli
       const diffMarkers =
         typeof node.properties.dataCodeDiffLines === 'string' ? node.properties.dataCodeDiffLines : '';
       delete node.properties.dataCodeDiffLines;
-      const isDiffLanguage = classList.includes('language-diff');
+      const isDiffLanguage = diffEnabled && classList.includes('language-diff');
       if (highlightLines.size === 0 && !showLineNumbers && !isDiffLanguage && diffMarkers === '') return;
 
       if (showLineNumbers) {

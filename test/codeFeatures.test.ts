@@ -102,9 +102,21 @@ describe('line number start', () => {
     expect(out).not.toContain('<span class="code-line-number">1</span>');
   });
 
-  it('works through the legacy helpers too and keeps {n} relative to the block', async () => {
-    const out = await renderMarkdownToHtml(fence('ts {2} showLineNumbers=10', 'const a = 1;', 'const b = 2;'));
+  it('keeps {n} relative to the block when numbering starts later', async () => {
+    const out = await html(fence('ts {2} showLineNumbers=10', 'const a = 1;', 'const b = 2;'));
     expect(out).toContain('<span class="code-line code-line-highlighted"><span class="code-line-number">11</span>');
+  });
+
+  it('legacy helpers keep the pre-0.5 fence grammar (no =N, no*, diff)', async () => {
+    const start = await renderMarkdownToHtml(fence('ts showLineNumbers=10', 'const a = 1;'));
+    expect(start).not.toContain('code-line-number');
+    const optOut = await renderMarkdownToHtml(fence('ts showLineNumbers noLineNumbers', 'x'));
+    expect(optOut).toContain('code-line-number');
+    const diffLang = await renderMarkdownToHtml(fence('diff', '+a', '-b'));
+    expect(diffLang).not.toContain('code-line-added');
+    const diffMeta = await renderMarkdownToHtml(fence('ts diff', '+a', '-b'));
+    expect(diffMeta).toContain('+a');
+    expect(diffMeta).not.toContain('data-code-diff-lines');
   });
 
   it('works with global lineNumbers on and an explicit start', async () => {
@@ -158,5 +170,19 @@ describe('mermaid entry', () => {
   it('does not add copy chrome to a mermaid fence when copyButton global is on', async () => {
     const out = await renderMarkdownToHtmlWithMermaid(fence('mermaid', 'graph TD; A-->B;'));
     expect(out).not.toContain('code-block-copy-button');
+  });
+});
+
+describe('line features without syntax highlighting', () => {
+  it('applies diff, line numbers and {n} highlights with highlighting off', async () => {
+    const { Featherdown } = await import('../src/index.js');
+    const fd = new Featherdown({ code: { highlighting: false } });
+    const { html: diffHtml } = await fd.parse(fence('ts diff', '+a', '-b'));
+    expect(diffHtml).toContain('code-line-added');
+    expect(diffHtml).toContain('code-line-removed');
+    expect(diffHtml).not.toContain('data-code-diff-lines');
+    expect(diffHtml).not.toContain('hljs');
+    const { html: numbered } = await fd.parse(fence('ts {2} showLineNumbers', 'a', 'b'));
+    expect(numbered).toContain('<span class="code-line code-line-highlighted"><span class="code-line-number">2</span>b</span>');
   });
 });

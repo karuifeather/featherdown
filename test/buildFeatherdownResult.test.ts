@@ -22,7 +22,7 @@ const sampleDocument = (): RenderMarkdownDocumentResult => ({
   estimatedReadingMinutes: 1,
 });
 
-const allDetected = { math: true, code: true, charts: true, embeds: true, mermaid: true };
+const allDetected = { math: true, code: true, charts: true, embeds: true, mermaid: true, tabs: true };
 
 describe('buildFeatherdownResult', () => {
   it('zeros publishing fields when publishing is fully disabled', () => {

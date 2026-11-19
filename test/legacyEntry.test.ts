@@ -3,18 +3,22 @@ import * as root from '../src/index.js';
 import * as legacy from '../src/legacy.js';
 import * as advanced from '../src/advanced.js';
 
-describe('featherdown/legacy entry', () => {
-  it('exposes the same helper functions as the deprecated root re-exports', () => {
-    expect(legacy.renderMarkdown).toBe(root.renderMarkdown);
-    expect(legacy.renderMarkdownDocument).toBe(root.renderMarkdownDocument);
-    expect(legacy.renderMarkdownToHtml).toBe(root.renderMarkdownToHtml);
-    expect(legacy.parseMarkdownFile).toBe(root.parseMarkdownFile);
+describe('package entry points', () => {
+  it('the root exports only the stable surface', () => {
+    expect(Object.keys(root).sort()).toEqual(['Featherdown', 'FeatherdownDiagnosticsError', 'libraryId']);
   });
 
-  it('keeps deprecated root advanced re-exports identical to featherdown/advanced', () => {
-    expect(root.createMarkdownProcessor).toBe(advanced.createMarkdownProcessor);
-    expect(root.rehypeChartBlocks).toBe(advanced.rehypeChartBlocks);
-    expect(root.rehypeCdnImages).toBe(advanced.rehypeCdnImages);
+  it('featherdown/legacy exposes the pre-Featherdown helpers', () => {
+    expect(Object.keys(legacy).sort()).toEqual([
+      'parseMarkdownFile',
+      'renderMarkdown',
+      'renderMarkdownDocument',
+      'renderMarkdownToHtml',
+    ]);
+  });
+
+  it('featherdown/advanced exposes the processor factory and rehype plugins', () => {
+    expect(Object.keys(advanced).sort()).toEqual(['createMarkdownProcessor', 'rehypeCdnImages', 'rehypeChartBlocks']);
   });
 
   it('renders through the legacy helper', async () => {

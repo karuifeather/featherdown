@@ -24,13 +24,8 @@ assert.equal(typeof advanced.createMarkdownProcessor, 'function');
 assert.equal(typeof advanced.rehypeChartBlocks, 'function');
 assert.equal(typeof advanced.rehypeCdnImages, 'function');
 
-assert.equal(typeof root.renderMarkdownToHtml, 'function');
-assert.equal(typeof root.renderMarkdown, 'function');
-assert.equal(typeof root.renderMarkdownDocument, 'function');
-assert.equal(typeof root.createMarkdownProcessor, 'function');
-assert.equal(typeof root.rehypeChartBlocks, 'function');
-assert.equal(typeof root.rehypeCdnImages, 'function');
-assert.equal(typeof root.parseMarkdownFile, 'function');
+/** The root is the stable surface only: legacy and advanced symbols live on their own subpaths. */
+assert.deepEqual(Object.keys(root).sort(), ['Featherdown', 'FeatherdownDiagnosticsError', 'libraryId']);
 
 assert.equal(typeof nodeOnly.renderMarkdownToHtmlWithMermaid, 'function');
 assert.equal(typeof new nodeOnly.Featherdown().parse, 'function');
@@ -81,13 +76,6 @@ const requiredRootNamedExports = [
   'Featherdown',
   'FeatherdownDiagnosticsError',
   'libraryId',
-  'renderMarkdownToHtml',
-  'renderMarkdown',
-  'renderMarkdownDocument',
-  'parseMarkdownFile',
-  'createMarkdownProcessor',
-  'rehypeChartBlocks',
-  'rehypeCdnImages',
 ];
 for (const name of requiredRootNamedExports) {
   assert.ok(
@@ -108,12 +96,13 @@ for (const name of requiredNodeNamedExports) {
 const requiredLegacyNamedExports = ['renderMarkdown', 'renderMarkdownDocument', 'renderMarkdownToHtml', 'parseMarkdownFile'];
 for (const name of requiredLegacyNamedExports) {
   assert.equal(typeof legacy[name], 'function', `dist/legacy.js must export "${name}".`);
-  assert.equal(legacy[name], root[name], `featherdown/legacy "${name}" must be the same function as the root re-export.`);
+  assert.equal(name in root, false, `dist/index.js must not re-export legacy helper "${name}".`);
 }
 
 const requiredAdvancedNamedExports = ['createMarkdownProcessor', 'rehypeChartBlocks', 'rehypeCdnImages'];
 for (const name of requiredAdvancedNamedExports) {
   assert.ok(name in advanced && advanced[name] !== undefined, `dist/advanced.js must export "${name}".`);
+  assert.equal(name in root, false, `dist/index.js must not re-export advanced symbol "${name}".`);
 }
 
 /** @param {unknown} exportEntry */

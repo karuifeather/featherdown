@@ -123,7 +123,7 @@ describe('content-based asset hints', () => {
   it('reports nothing for a plain document', async () => {
     const r = await new Featherdown().parse('# Hi\n\nJust text.\n');
     expect(r.assets.styles).toEqual([base]);
-    expect(r.assets.features).toEqual({ math: false, code: false, charts: false, mermaid: false, embeds: false });
+    expect(r.assets.features).toEqual({ math: false, code: false, charts: false, mermaid: false, embeds: false, tabs: false });
   });
 
   it('detects math, code, charts', async () => {

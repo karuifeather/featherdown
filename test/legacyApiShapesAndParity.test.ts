@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Featherdown } from '../src/featherdown.js';
-import {
-  createMarkdownProcessor,
-  parseMarkdownFile,
-  renderMarkdown,
-  renderMarkdownDocument,
-  renderMarkdownToHtml,
-} from '../src/index.js';
+import { createMarkdownProcessor } from '../src/advanced.js';
+import { parseMarkdownFile, renderMarkdown, renderMarkdownDocument, renderMarkdownToHtml } from '../src/legacy.js';
 import { Featherdown as NodeFeatherdown, renderMarkdownToHtmlWithMermaid } from '../src/node.js';
 
 describe('legacy API return shapes', () => {

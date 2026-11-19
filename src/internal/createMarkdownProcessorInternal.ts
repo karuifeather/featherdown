@@ -1,10 +1,10 @@
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import rehypeHighlight from 'rehype-highlight';
-import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeSlug from 'rehype-slug';
 import rehypeStringify from 'rehype-stringify';
+import { defListHastHandlers, remarkDefinitionList } from 'remark-definition-list';
 import remarkDirective from 'remark-directive';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -23,7 +23,9 @@ import rehypeChartBlocksInternal from './rehypeChartBlocksInternal.js';
 import rehypeCodeBlockTitles from './rehypeCodeBlockTitles.js';
 import rehypeCodeLineHighlights from './rehypeCodeLineHighlights.js';
 import rehypeDedupeFootnoteIds from './rehypeDedupeFootnoteIds.js';
+import rehypeKatexConfigured from './rehypeKatexConfigured.js';
 import rehypeResolveClobberedHrefs from './rehypeResolveClobberedHrefs.js';
+import rehypeTabs from './rehypeTabs.js';
 import { remarkCallouts } from './remarkCallouts.js';
 import { remarkCodeBlockTitles } from './remarkCodeBlockTitles.js';
 import rehypeEmbeds from './rehypeEmbeds.js';
@@ -32,6 +34,9 @@ import rehypeLinks from './rehypeLinks.js';
 import remarkDetails from './remarkDetails.js';
 import remarkEmbeds from './remarkEmbeds.js';
 import remarkGithubAlerts from './remarkGithubAlerts.js';
+import remarkRestoreTextDirectives from './remarkRestoreTextDirectives.js';
+import remarkSubSuperscript from './remarkSubSuperscript.js';
+import remarkTabs from './remarkTabs.js';
 import { markdownSanitizeSchema, markdownSanitizeSchemaWithEmbeds } from './sanitizeSchema.js';
 
 /** Optional pipeline stages for {@link Featherdown}; omit for legacy all-on behavior. */
@@ -45,6 +50,12 @@ export type MarkdownProcessorFeatureGates = {
   alerts: boolean;
   /** `:::details` collapsibles. */
   details: boolean;
+  /** `H~2~O` / `x^2^`. */
+  subSuperscript: boolean;
+  /** `Term` / `: Definition` lists. */
+  definitionLists: boolean;
+  /** `::::tabs` / `:::tab[Label]`. */
+  tabs: boolean;
   /** External link attributes. */
   links: boolean;
   /** Image loading attributes / figures. */
@@ -86,6 +97,9 @@ export const ALL_FEATURES_ON: MarkdownProcessorFeatureGates = {
   // Stages added after the legacy helpers froze their output stay off for them.
   alerts: false,
   details: false,
+  subSuperscript: false,
+  definitionLists: false,
+  tabs: false,
   links: false,
   images: false,
   embeds: false,
@@ -115,13 +129,24 @@ export function createMarkdownProcessorInternal(options?: InternalProcessorOptio
   const gates = options?.features ?? ALL_FEATURES_ON;
   const contextFromFile = options?.contextFromFile === true;
 
-  const processor = unified().use(remarkParse).use(remarkGfm).use(remarkDirective);
+  // `~x~` is subscript when that stage is on, so GFM keeps only `~~x~~` as strikethrough.
+  const processor = unified()
+    .use(remarkParse)
+    .use(remarkGfm, gates.subSuperscript ? { singleTilde: false } : {})
+    .use(remarkDirective);
+
+  if (gates.definitionLists) {
+    processor.use(remarkDefinitionList);
+  }
 
   if (gates.math) {
     processor.use(remarkMath);
   }
 
   processor.use(remarkHeadingIds);
+
+  // No inline directives are defined; keep `10:30` and `:smile:` as the text they were.
+  processor.use(remarkRestoreTextDirectives);
 
   // Directive-based stages must run before remarkCallouts, which turns any
   // unrecognized container directive back into plain text.
@@ -131,11 +156,18 @@ export function createMarkdownProcessorInternal(options?: InternalProcessorOptio
   if (gates.embeds) {
     processor.use(remarkEmbeds);
   }
+  if (gates.tabs) {
+    processor.use(remarkTabs);
+  }
 
   processor.use(remarkCallouts);
 
   if (gates.alerts) {
     processor.use(remarkGithubAlerts);
+  }
+
+  if (gates.subSuperscript) {
+    processor.use(remarkSubSuperscript);
   }
 
   if (gates.code) {
@@ -151,7 +183,11 @@ export function createMarkdownProcessorInternal(options?: InternalProcessorOptio
   // remark-rehype prefix footnote ids too would double them. Hrefs are
   // re-pointed at the prefixed ids by rehypeResolveClobberedHrefs below.
   processor
-    .use(remarkRehype, gates.sanitize ? { allowDangerousHtml: true, clobberPrefix: '' } : { allowDangerousHtml: true })
+    .use(remarkRehype, {
+      allowDangerousHtml: true,
+      ...(gates.sanitize ? { clobberPrefix: '' } : {}),
+      ...(gates.definitionLists ? { handlers: defListHastHandlers } : {}),
+    })
     .use(rehypeRaw);
 
   if (gates.sanitize) {
@@ -187,11 +223,18 @@ export function createMarkdownProcessorInternal(options?: InternalProcessorOptio
   }
 
   if (gates.math) {
-    // KaTeX runs after sanitize, so keep its own HTML-extension commands (\href, \htmlStyle, ...) off.
-    processor.use(rehypeKatex, { output: 'html', trust: false });
+    // KaTeX runs after sanitize, so its HTML-extension commands (\href, \htmlStyle, ...) stay
+    // off unless `math.trust` is set. Options are read per parse (see rehypeKatexConfigured).
+    processor.use(rehypeKatexConfigured);
   }
 
   processor.use(rehypeSlug).use(rehypeAutolinkHeadings, { behavior: 'wrap' });
+
+  // After sanitize (buttons and generated ids are trusted output, not author input) and after
+  // rehype-slug, so generated tab ids can avoid every id already in the document.
+  if (gates.tabs) {
+    processor.use(rehypeTabs);
+  }
 
   if (gates.code && gates.codeHighlighting) {
     processor.use(rehypeHighlight);

@@ -167,6 +167,7 @@ export type DetectedFeatures = {
   charts: boolean;
   embeds: boolean;
   mermaid: boolean;
+  tabs: boolean;
 };
 
 function classNames(node: Element): string[] {
@@ -177,7 +178,7 @@ function classNames(node: Element): string[] {
 
 /** Scans the final HAST for rendered KaTeX, code blocks, chart mounts, iframes and Mermaid SVG. */
 export function detectFeatures(root: HastRoot): DetectedFeatures {
-  const found: DetectedFeatures = { math: false, code: false, charts: false, embeds: false, mermaid: false };
+  const found: DetectedFeatures = { math: false, code: false, charts: false, embeds: false, mermaid: false, tabs: false };
   visit(root, 'element', (node) => {
     const classes = classNames(node);
     if (classes.includes('katex') || classes.includes('katex-display')) {
@@ -188,6 +189,9 @@ export function detectFeatures(root: HastRoot): DetectedFeatures {
     }
     if (node.tagName === 'pre' && node.children.some((c) => c.type === 'element' && c.tagName === 'code')) {
       found.code = true;
+    }
+    if (node.tagName === 'div' && classes.includes('tabs-list')) {
+      found.tabs = true;
     }
     if (node.tagName === 'iframe') {
       found.embeds = true;
@@ -217,6 +221,9 @@ function cacheKey(gates: MarkdownProcessorFeatureGates, mermaid: boolean): strin
     gates.sanitize,
     gates.alerts,
     gates.details,
+    gates.subSuperscript,
+    gates.definitionLists,
+    gates.tabs,
     gates.links,
     gates.images,
     gates.embeds,

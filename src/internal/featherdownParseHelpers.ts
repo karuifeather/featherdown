@@ -33,6 +33,9 @@ export function toProcessorGates(resolved: ResolvedFeatherdownOptions): Markdown
     sanitize: resolved.sanitize,
     alerts: resolved.alerts,
     details: resolved.details,
+    subSuperscript: resolved.subSuperscript,
+    definitionLists: resolved.definitionLists,
+    tabs: resolved.tabs,
     links: resolved.links.enabled,
     images: resolved.images.enabled,
     embeds: resolved.embeds.enabled,
@@ -45,5 +48,6 @@ export function toPipelineFeatureConfig(resolved: ResolvedFeatherdownOptions): P
     links: resolved.links,
     images: resolved.images,
     embeds: resolved.embeds,
+    math: { macros: resolved.math.macros, trust: resolved.math.trust, strict: resolved.math.strict },
   };
 }

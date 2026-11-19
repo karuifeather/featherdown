@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Featherdown, renderMarkdownToHtml } from '../src/index.js';
+import { Featherdown } from '../src/index.js';
+import { renderMarkdownToHtml } from '../src/legacy.js';
 import { renderMarkdownToHtmlWithMermaid } from '../src/node.js';
 
 const fence = (info: string, ...lines: string[]): string => ['```' + info, ...lines, '```', ''].join('\n');

@@ -14,6 +14,7 @@ const NOTHING_DETECTED: DetectedFeatures = {
   charts: false,
   embeds: false,
   mermaid: false,
+  tabs: false,
 };
 
 /** A feature is reported only when its option is on AND it was actually rendered. */
@@ -28,6 +29,7 @@ function effectiveFeatures(
     charts: resolved.charts && detected.charts,
     mermaid: mermaidFeature && detected.mermaid,
     embeds: resolved.embeds.enabled && detected.embeds,
+    tabs: resolved.tabs && detected.tabs,
   };
 }
 

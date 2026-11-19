@@ -27,6 +27,8 @@ The default npm entry is **browser-safe**. Optional **Node-only** Mermaid (inlin
 - [Math](#math)
 - [Charts](#charts)
 - [Callouts, alerts, and details](#callouts-alerts-and-details)
+- [Subscript, superscript, and definition lists](#subscript-superscript-and-definition-lists)
+- [Tabs](#tabs)
 - [Footnotes](#footnotes)
 - [Links and images](#links-and-images)
 - [Embeds](#embeds)
@@ -45,6 +47,7 @@ The default npm entry is **browser-safe**. Optional **Node-only** Mermaid (inlin
 - [Advanced and compatibility APIs](#advanced-and-compatibility-apis)
 - [Migration from legacy helpers](#migration-from-legacy-helpers)
 - [Public API summary](#public-api-summary)
+- [Stability and versioning](#stability-and-versioning)
 - [Scripts](#scripts), [Site](#site), [Maintainers](#maintainers)
 
 ## Install
@@ -137,6 +140,9 @@ What you get from `new Featherdown()` with no options:
 | `charts` | **on** | Valid `chart-*` fences become mount placeholders. |
 | `alerts` | **on** | `> [!NOTE]` and friends become callouts. |
 | `details` | **on** | `:::details[Summary]` becomes `<details>`. |
+| `subSuperscript` | **on** | `H~2~O` and `x^2^` become `<sub>` / `<sup>`. Single `~x~` is no longer strikethrough (use `~~x~~`). |
+| `definitionLists` | **on** | `Term` then `: Definition` becomes `<dl>`. |
+| `tabs` | **on** | `::::tabs` with `:::tab[Label]` panels becomes tab markup. Needs a few lines of JS to switch panels. |
 | `headings` | **on** | Fills `toc`, `tocTree`, `headings` (depth 1–6). |
 | `publishing` | **on** | Fills `excerpt`, `wordCount`, `estimatedReadingMinutes`. |
 | `diagnostics` | **on** (warn) | Returned on `result.diagnostics`; never throws unless `"strict"`. |
@@ -160,6 +166,9 @@ Behaviors that surprise people. Each one is intentional, but easy to trip on.
 **Content**
 
 - **Stray dollar signs become math.** With `math` on (the default), `costs $5 or $10` renders `5 or` as a formula. Escape each sign (`\$5`) or set `math: false`. Dollar signs inside inline code and code fences are safe.
+- **`~x~` is subscript, not strikethrough.** With `subSuperscript` on (the default), only `~~x~~` strikes through. The marks must enclose text with no whitespace, so `~/src and ~/dist` and `a ^ b ^ c` are left alone. Backslash escapes are resolved before this runs, so `\^x\^` still becomes a superscript; put a space inside the pair to show it literally.
+- **Tabs need four colons on the outside.** Write `::::tabs` around `:::tab[Label]`. The markup has no behavior until you wire it up ([Tabs](#tabs)); until then every panel is shown under its label.
+- **Broken math is reported, not thrown.** An equation KaTeX cannot render stays on the page as red text and adds a `math.render` diagnostic. Use `diagnostics: "strict"` to fail a build on it.
 - **Custom heading ids are prefixed.** A heading written `## Top {#my-id}` renders `id="user-content-my-id"`, and `toc` / `headings` report the same prefixed id. Links inside the document (`[x](#my-id)`) are rewritten to match, but links to the page from **elsewhere** must use the prefixed id. Automatic ids (`## Top` → `top`) are not prefixed.
 - **Ids that collide with footnotes are renamed.** `## Top {#fn-1}` becomes `user-content-fn-1-1` so it cannot duplicate the footnote's id. Author links written `#fn-1` still go to the footnote.
 - **`code: false` disables fence extras.** `title="..."`, `{2,4}` line highlights, line numbers, copy hooks, and `diff` marking are all part of the code pipeline.
@@ -175,7 +184,7 @@ Behaviors that surprise people. Each one is intentional, but easy to trip on.
 **Versions and imports**
 
 - **The legacy helpers are not `Featherdown`.** `renderMarkdownToHtml` and friends take the older `RenderMarkdownOptions` and get none of the newer features. See [Migration](#migration-from-legacy-helpers).
-- **Root re-exports of legacy and advanced symbols are deprecated.** Import from `featherdown/legacy` and `featherdown/advanced`.
+- **The root exports only `Featherdown`, `FeatherdownDiagnosticsError`, `libraryId`, and types.** Legacy helpers live on `featherdown/legacy` and the processor and rehype plugins on `featherdown/advanced`.
 - **JSR has no CSS subpaths.** Use npm (or a bundler) for `featherdown/styles.css`.
 
 Fixes and behavior changes by release are in [CHANGELOG.md](./CHANGELOG.md); the **Changed** entries marked **Behavior** are the ones most likely to affect existing output.
@@ -197,7 +206,7 @@ Fixes and behavior changes by release are in [CHANGELOG.md](./CHANGELOG.md); the
 | **`wordCount`** / **`estimatedReadingMinutes`** | Derived from the rendered document text (subject to `publishing` options). |
 | **`stats`** | Mirrors `wordCount` and reading time for convenience. |
 | **`diagnostics`** | Non-fatal warnings (for example invalid chart JSON, manifest misses, or blocked embeds). See [Diagnostics](#diagnostics). |
-| **`assets`** | Hints such as **`assets.styles`** (selective package CSS paths) and **`assets.features`** (`math`, `code`, `charts`, `mermaid`, `embeds`). |
+| **`assets`** | Hints such as **`assets.styles`** (selective package CSS paths) and **`assets.features`** (`math`, `code`, `charts`, `mermaid`, `embeds`, `tabs`). |
 
 `assets.styles` and `assets.features` reflect **content actually rendered** in the document, not just which options are enabled. For example, `features.embeds` is `true` only when an embed was emitted, and `features.mermaid` is `true` only on the Node entry when an SVG diagram was produced. `assets.styles` lists **selective** style paths (for example `featherdown/styles/base.css`), not the all-in `featherdown/styles.css` aggregate.
 
@@ -260,9 +269,9 @@ const featherdown = new Featherdown({
 ### Option reference
 
 - **`frontmatter`** — `false`, `true`, or `"auto"`; controls whether leading YAML front matter is parsed and stripped from `body`. Default `false`. See [Front matter](#front-matter).
-- **`math`** — Toggle KaTeX HTML output for `$…$` / `$$…$$`. See [Math](#math).
+- **`math`** — Toggle KaTeX HTML output for `$…$` / `$$…$$`, or pass an object with **`macros`**, **`trust`**, and **`strict`**. See [Math](#math).
 - **`code`** — Toggle code pipeline features; **`highlighting`** controls whether highlight.js classes and **`highlight.css`** are relevant. **`lineNumbers`** and **`copyButton`** set global defaults for every fence (both default `false`). See [Code blocks](#code-blocks).
-- **`sanitize`** — When enabled, author content (Markdown and raw HTML) passes through `rehype-sanitize` with the package schema **before** Featherdown adds its own markup (KaTeX, code chrome, chart mounts, heading anchors, embeds). Raw HTML keeps safe tags and attributes but loses `style`, `<button>`, and any `class` other than `language-*` on `code`, the callout classes on `div`, and the `details` class on `details` (which is kept).
+- **`sanitize`** — When enabled, author content (Markdown and raw HTML) passes through `rehype-sanitize` with the package schema **before** Featherdown adds its own markup (KaTeX, code chrome, chart mounts, heading anchors, embeds). Raw HTML keeps safe tags and attributes but loses `style`, `<button>`, and any `class` other than `language-*` on `code`, the callout classes on `div`, and the `details` class on `details` (which is kept), plus `tabs` / `tab-panel` on `div` (with `data-tab-label`) for [tabs](#tabs).
 - **`diagnostics`** — Controls whether warnings appear on the result and whether strict mode fails the parse. See [Diagnostics](#diagnostics).
   - **`false`** — `result.diagnostics` is always `[]` (issues may still be detected internally).
   - **`true`** or **`"warn"`** — Non-fatal diagnostics are returned on `result.diagnostics`; the parse does not throw.
@@ -278,6 +287,9 @@ const featherdown = new Featherdown({
 - **`publishing`** — Gates excerpt, word count, and reading-time fields on the result.
 - **`alerts`** — GitHub-style alerts (`> [!NOTE]`) become callouts. Default **`true`**. See [Callouts, alerts, and details](#callouts-alerts-and-details).
 - **`details`** — `:::details[Summary]` collapsible sections. Default **`true`**.
+- **`subSuperscript`** — `H~2~O` and `x^2^`. Default **`true`**. See [Subscript, superscript, and definition lists](#subscript-superscript-and-definition-lists).
+- **`definitionLists`** — `Term` / `: Definition`. Default **`true`**.
+- **`tabs`** — `::::tabs` / `:::tab[Label]`. Default **`true`**. See [Tabs](#tabs).
 - **`links`** — External link decoration. **Opt in** (default off). Accepts `true` or an object:
   - **`rel`** — Default `"noopener noreferrer"`. Tokens are merged without duplicates. `false` leaves `rel` alone.
   - **`target`** — Default `"_blank"`. `false` leaves `target` alone.
@@ -288,7 +300,7 @@ const featherdown = new Featherdown({
   - **`decoding`** — `"async"` (default), `"sync"`, `"auto"`, or `false` to omit the attribute.
   - **`figure`** — Default `false`. When `true`, a paragraph containing only one titled image becomes `<figure class="markdown-figure">` with a `<figcaption>` from the title, and the `title` attribute is dropped. Linked images keep the link inside the figure.
 - **`embeds`** — Allowlisted iframes and `::embed` directives. **Opt in** (default off). See [Embeds](#embeds).
-- **`plugins`** — Extra unified plugins: `{ remark?, rehype? }`. See [Security and trust](#security-and-trust).
+- **`plugins`** — Extra unified plugins: `{ remark?, rehype? }`. See [Security and trust](#security-and-trust). Remark plugins run after Featherdown's own directive stages. By then every inline directive (`:name[label]{attrs}`, including accidental ones such as `10:30`) and every container directive Featherdown does not handle is plain text, so a remark plugin cannot add its own inline or container directives. Unhandled leaf directives (`::name{attrs}`) are still present in the tree.
 - **`kind`**, **`slug`**, **`manifest`** — Manifest-based image URL rewriting. See [Links and images](#links-and-images).
 
 Avoid treating every nested field on `FeatherdownOptions` as a global behavioral switch unless documented here.
@@ -378,6 +390,27 @@ Ensure KaTeX styles are loaded (all-in `featherdown/styles.css`, or `featherdown
 
 Because `$` delimits math, prose with several dollar signs can be misread as a formula. Escape them (`\$5 or \$10`) or turn math off for that content.
 
+### KaTeX options
+
+Pass an object instead of `true` to configure KaTeX:
+
+```ts
+const featherdown = new Featherdown({
+  math: {
+    macros: { "\\RR": "\\mathbb{R}", "\\norm": "\\left\\lVert #1 \\right\\rVert" },
+    strict: "warn",
+  },
+});
+
+await featherdown.parse("$x \\in \\RR$ and $\\norm{x}$");
+```
+
+- **`macros`** — KaTeX macros; keys start with a backslash. Constructor and per-call macros are merged, with the per-call value winning on a conflict. Every parse gets its own copy, so a `\gdef` in one document never leaks into the next.
+- **`strict`** — How KaTeX treats valid but non-strict input, such as Unicode text in math mode. `"ignore"` (the default) stays silent. `"warn"` adds a `math.strict` diagnostic. `"error"` (or `true`) adds a `math.render` diagnostic. The equation renders in every mode, so pair `"warn"` or `"error"` with `diagnostics: "strict"` to fail a build on non-strict LaTeX.
+- **`trust`** — Default `false`. When `true`, KaTeX's HTML-extension commands (`\href`, `\url`, `\includegraphics`, `\htmlClass`, `\htmlId`, `\htmlStyle`, `\htmlData`) work. KaTeX output is added **after** sanitization, so this lets math author arbitrary links, ids, classes, and inline styles. Use it only for content you trust. While it is off, each blocked command adds a `math.trust` diagnostic.
+
+An equation that fails to render stays on the page as red text and adds a `math.render` diagnostic, so `diagnostics: "strict"` catches broken math in CI.
+
 ## Charts
 
 Valid `chart-*` fenced JSON becomes a **`chart-mount`** placeholder with `data-chart` and `data-chart-data`. The package does **not** bundle a chart runtime—your app hydrates or renders charts.
@@ -415,6 +448,92 @@ Hidden **content**.
 ```
 
 This renders `<details class="details" open>` with a `<summary>`. The summary defaults to `Details` when omitted. Callouts and alerts can be nested inside details. Set `details: false` to leave the directive as plain text.
+
+## Subscript, superscript, and definition lists
+
+```md
+H~2~O, x^2^, and CO~2~ emissions
+
+Term
+: First definition
+: Second definition
+
+Another term
+: With **inline** markdown
+```
+
+This renders `H<sub>2</sub>O`, `x<sup>2</sup>`, and a `<dl>` with `<dt>` and `<dd>` elements.
+
+- **Sub and superscript.** `~text~` becomes `<sub>` and `^text^` becomes `<sup>`. The text between the marks cannot contain whitespace, so `~/src and ~/dist` and `a ^ b ^ c` stay as written. Code, math, code fences, link destinations, bare URLs, and footnote references (`[^1]`) are never touched. Only the double-tilde `~~x~~` is strikethrough while this is on. Set `subSuperscript: false` to restore GFM's single-tilde strikethrough.
+- **Definition lists.** A term line followed by lines starting with `: `. Set `definitionLists: false` to leave them as text.
+
+Both are on by default for `Featherdown` and are not applied by the legacy helpers.
+
+## Tabs
+
+```md
+::::tabs
+:::tab[npm]
+`npm install featherdown`
+:::
+:::tab[pnpm]
+`pnpm add featherdown`
+:::
+::::
+```
+
+The outer fence needs more colons than the inner one (`::::tabs` around `:::tab`). Panels can contain any markdown, including code fences, callouts, and details. A panel with no label is titled `Tab 1`, `Tab 2`, and so on.
+
+The output is semantic markup only:
+
+```html
+<div class="tabs">
+  <div class="tabs-list" role="tablist">
+    <button type="button" role="tab" class="tabs-tab" id="featherdown-tab-1-1" aria-controls="featherdown-panel-1-1" aria-selected="true" tabindex="0">npm</button>
+    <button type="button" role="tab" class="tabs-tab" id="featherdown-tab-1-2" aria-controls="featherdown-panel-1-2" aria-selected="false" tabindex="-1">pnpm</button>
+  </div>
+  <div class="tab-panel" id="featherdown-panel-1-1" role="tabpanel" aria-labelledby="featherdown-tab-1-1" data-tab-label="npm">…</div>
+  <div class="tab-panel" id="featherdown-panel-1-2" role="tabpanel" aria-labelledby="featherdown-tab-1-2" data-tab-label="pnpm">…</div>
+</div>
+```
+
+Featherdown ships no client runtime, so switching panels is up to your app. Until a group has `data-tabs-ready`, the shipped CSS hides the tab list and shows every panel under its label, so the content still reads correctly without JavaScript. Once you set the attribute, show one panel at a time:
+
+```js
+document.querySelectorAll(".featherdown-content .tabs").forEach((group) => {
+  const tabs = [...group.querySelectorAll(':scope > .tabs-list > [role="tab"]')];
+  const panels = [...group.querySelectorAll(':scope > [role="tabpanel"]')];
+  const select = (index) => {
+    tabs.forEach((tab, i) => {
+      tab.setAttribute("aria-selected", String(i === index));
+      tab.tabIndex = i === index ? 0 : -1;
+    });
+    panels.forEach((panel, i) => {
+      panel.hidden = i !== index;
+    });
+  };
+  tabs.forEach((tab, i) => {
+    tab.addEventListener("click", () => select(i));
+    tab.addEventListener("keydown", (event) => {
+      const target =
+        event.key === "ArrowRight" ? i + 1
+        : event.key === "ArrowLeft" ? i - 1
+        : event.key === "Home" ? 0
+        : event.key === "End" ? tabs.length - 1
+        : null;
+      if (target === null) return;
+      event.preventDefault();
+      const next = (target + tabs.length) % tabs.length;
+      select(next);
+      tabs[next].focus();
+    });
+  });
+  select(0);
+  group.setAttribute("data-tabs-ready", "");
+});
+```
+
+Generated ids look like `featherdown-tab-1-1` and `featherdown-panel-1-1`. They are checked against every id already in the document (heading slugs included), and a group number is skipped if any of its ids is taken, so ids stay unique. A `:::tabs` block with no `:::tab` panels, content outside a panel, or a `:::tab` outside any `::::tabs` reports `tabs.invalid`. `result.assets.features.tabs` is `true` when a tab group was rendered. Set `tabs: false` to leave the directives as text.
 
 ## Footnotes
 
@@ -527,6 +646,10 @@ Diagnostics are non-fatal warnings on `result.diagnostics`. Each has a `code`, a
 | `images.manifest_miss` | `images` | A manifest lookup finds no entry for an image. The original `src` is kept. |
 | `embeds.blocked` | `embeds` | A raw iframe or `::embed` URL did not match the allowlist, or an iframe had no `src`. A directive with a well-formed but disallowed `src` (such as `::embed{src="javascript:..."}`) also reports this. |
 | `embeds.invalid` | `embeds` | A directive is missing required input or has a malformed id (for example `::youtube{id="bad"}` or `::embed{}`). |
+| `math.render` | `math` | KaTeX could not render an equation (a parse error or an undefined command), or `math.strict` is `"error"` and the input is not strict LaTeX. The equation stays on the page as red text. |
+| `math.strict` | `math` | `math.strict` is `"warn"` and an equation is valid but not strict LaTeX. It still renders. |
+| `math.trust` | `math` | An equation used a KaTeX HTML-extension command (`\href`, `\htmlStyle`, ...) while `math.trust` is off. |
+| `tabs.invalid` | `tabs` | A `:::tabs` block has no panels or has content outside a panel, or a `:::tab` is outside a `::::tabs` block. |
 
 Not everything produces a diagnostic. Invalid front matter YAML, for instance, is silently treated as body content.
 
@@ -608,6 +731,8 @@ Rendered output uses stable classes including:
 - **Code:** `code-block`, `code-block-title`, `code-line`, `code-line-highlighted`, `code-line-added`, `code-line-removed`, `code-line-numbered`, `code-line-number`, `code-block-copyable`, `code-block-copy-button`
 - **Charts:** `chart-mount`
 - **Images:** `markdown-inline-img`, `markdown-figure` (on `<figure>`)
+- **Tabs:** `tabs`, `tabs-list`, `tabs-tab`, `tab-panel` (`data-tab-label` on panels, `data-tabs-ready` set by your script)
+- **Sub and superscript, definition lists:** plain `<sub>`, `<sup>`, `<dl>`, `<dt>`, `<dd>`
 - **Embeds:** `embed` and `embed-<provider>` (`youtube`, `vimeo`, `codepen`, `codesandbox`, `stackblitz`, or `custom`)
 
 ## Security and trust
@@ -616,6 +741,7 @@ Rendered output uses stable classes including:
 - Scripts, event handlers, and `javascript:` URLs are stripped. This holds only while `sanitize` is on.
 - Prefer the **default** entry for untrusted user content.
 - The **Node Mermaid** path sanitizes diagram SVG too, but Mermaid itself executes diagram source in headless Chromium; it is better suited to **trusted** publishing inputs.
+- **KaTeX `trust`** is off by default. Turning it on lets math emit links, ids, classes, and inline styles after sanitization, so enable it only for trusted content.
 - **Embeds** are off by default. When enabled, they are limited to the provider and host allowlists above. Do not add your own site's origin to `allowHosts`, because embeds run with `allow-same-origin`.
 - **User plugins:** `plugins.remark` runs before HTML conversion, so its output is still sanitized. `plugins.rehype` runs **after** sanitization, right before serialization, and its output is **not** sanitized. Treat rehype plugins as trusted code, and never build them from user input.
 
@@ -635,7 +761,7 @@ const featherdown = new Featherdown({
 | **`featherdown`** | Browser-safe; no Mermaid / Playwright in the default bundle. |
 | **`featherdown/node`** | Node **`Featherdown`**, optional Mermaid SVG, **`parseFile`**. |
 | **`featherdown/advanced`** | Processor + rehype plugins for unified integrations. |
-| **`featherdown/legacy`** | Deprecated pre-`Featherdown` helper functions. |
+| **`featherdown/legacy`** | Pre-`Featherdown` helper functions (older `RenderMarkdownOptions` surface). |
 
 `featherdown/node` (including Mermaid) is also available from JSR as `@karuifeather/featherdown/node`; Mermaid still needs the Playwright / Chromium setup.
 
@@ -702,7 +828,7 @@ import {
 } from "featherdown/advanced";
 ```
 
-The same symbols are still re-exported from the **root** package, but those root re-exports are **deprecated** and will be removed in a future minor release—import them from **`featherdown/advanced`**.
+These symbols are not exported from the root package; import them from **`featherdown/advanced`**.
 
 ### Legacy function exports (`featherdown/legacy`)
 
@@ -712,7 +838,7 @@ Older helpers (`renderMarkdownToHtml`, `renderMarkdown`, `renderMarkdownDocument
 import { renderMarkdownToHtml } from "featherdown/legacy";
 ```
 
-They are still re-exported from the package root, marked **`@deprecated`**, for one more minor release; switch imports to **`featherdown/legacy`** (or migrate to **`Featherdown`**) before the root re-exports are removed. They take **`RenderMarkdownOptions`**, not the full **`FeatherdownOptions`** surface (for example **`math`**, **`code`**, **`charts`**, **`frontmatter`**, **`alerts`**, **`links`**, **`images`**, **`embeds`**, and **`diagnostics: "strict"`** are **`Featherdown`** features). Their output does not include these enhancements. Prefer **`new Featherdown().parse()`** for new code.
+They are no longer exported from the package root (before 1.0 the root re-exported them as deprecated); import them from **`featherdown/legacy`** or migrate to **`Featherdown`**. They take **`RenderMarkdownOptions`**, not the full **`FeatherdownOptions`** surface (for example **`math`**, **`code`**, **`charts`**, **`frontmatter`**, **`alerts`**, **`links`**, **`images`**, **`embeds`**, and **`diagnostics: "strict"`** are **`Featherdown`** features). Their output does not include these enhancements. Prefer **`new Featherdown().parse()`** for new code.
 
 ## Migration from legacy helpers
 
@@ -755,9 +881,30 @@ const { html } = await new Featherdown().parse(markdown);
 
 - `featherdown/styles.css`, `featherdown/styles/base.css`, `featherdown/styles/katex.css`, `featherdown/styles/code.css`, `featherdown/styles/highlight.css`
 
-**Compatibility (deprecated)**
+**Compatibility**
 
-- Legacy render helpers and **`parseMarkdownFile`** from **`featherdown/legacy`** (still re-exported from the root for now); **`renderMarkdownToHtmlWithMermaid`** on **`featherdown/node`**; **`featherdown/advanced`** for processor/plugins.
+- Legacy render helpers and **`parseMarkdownFile`** from **`featherdown/legacy`**; **`renderMarkdownToHtmlWithMermaid`** (deprecated) on **`featherdown/node`**; **`featherdown/advanced`** for processor/plugins.
+
+## Stability and versioning
+
+featherdown follows [semantic versioning](https://semver.org/) from 1.0.0.
+
+**Covered by semver** (a breaking change needs a new major version):
+
+- The package entry points: `featherdown`, `featherdown/node`, `featherdown/advanced`, `featherdown/legacy`, and the documented `featherdown/styles*.css` files.
+- The `Featherdown` class: option names, their defaults, and the shape of `FeatherdownResult`.
+- Diagnostic `code` and `source` values.
+- The class names and element structure listed under [HTML contracts](#html-contracts).
+
+**Not covered:**
+
+- Exact whitespace, and the markup produced by dependencies: KaTeX's and highlight.js's internal classes and structure, and Mermaid SVG.
+- Anything not exported or not documented here, including internal modules and the layout of `dist/`.
+- The wording of diagnostic `message` text.
+
+**Output can change in a minor release** when a new syntax is added and enabled by default, because it can change how existing documents render. Those changes are listed in [CHANGELOG.md](./CHANGELOG.md) under **Changed** with a **Behavior** label, and each one comes with an option to turn it off (for example `subSuperscript: false`). Pin an exact version if you need byte-identical output.
+
+Deprecated APIs stay for at least one minor release before removal, and removals happen only in a major release.
 
 ## Scripts
 
